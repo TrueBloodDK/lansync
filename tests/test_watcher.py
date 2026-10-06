@@ -35,8 +35,9 @@ class WatchTests(unittest.TestCase):
             handler.on_any_event(SimpleNamespace(event_type=kind))
         self.assertTrue(pending.empty())
         for _ in range(1000):
-            handler.on_any_event(SimpleNamespace(event_type="modified"))
+            handler.on_any_event(SimpleNamespace(event_type="modified", src_path="file"))
         self.assertEqual(pending.qsize(), 1)
+        self.assertTrue(handler.overflow.is_set())
 
     def test_invalid_intervals(self):
         for value in (0, -1, float("nan"), float("inf")):
@@ -120,7 +121,7 @@ class WatchTests(unittest.TestCase):
                 snapshots.append(manifest)
                 if len(snapshots) == 1:
                     (root / "late").write_text("new")
-                    observer.handler.on_any_event(SimpleNamespace(event_type="created"))
+                    observer.handler.on_any_event(SimpleNamespace(event_type="created", src_path=str(root / "late")))
                 else:
                     stop.set()
 

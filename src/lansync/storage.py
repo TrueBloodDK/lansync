@@ -32,22 +32,30 @@ class Store:
         with self.connection:
             metadata = dict(self.connection.execute("SELECT key, value FROM meta"))
             entries = {path: json.loads(data) for path, data in self.connection.execute("SELECT path, data FROM entries")}
+            before = {path: dict(entry) for path, entry in entries.items()}
+            def covered(path):
+                return result.scopes is None or any(path == scope or path.startswith(scope + "/") for scope in result.scopes)
+
+            previous = json.loads(metadata.get("last_manifest", "{}"))
+            errors = result.errors + [item for item in previous.get("errors", []) if not covered(item["path"])]
+            excluded = result.skipped + [item for item in previous.get("skipped", []) if not covered(item["path"])]
             # Conservative policy: a partial scan cannot prove any deletion.
             if not result.errors:
                 skipped = [item["path"] for item in result.skipped]
                 for path, entry in entries.items():
                     protected = any(path == prefix or path.startswith(prefix + "/") for prefix in skipped)
-                    if path not in result.entries and not protected:
+                    if covered(path) and path not in result.entries and not protected:
                         entry["deleted"] = True
             entries.update(result.entries)
             generation = int(metadata["generation"]) + 1
             self.connection.executemany("INSERT OR REPLACE INTO entries VALUES (?, ?)",
-                                        [(path, json.dumps(entry, ensure_ascii=False)) for path, entry in entries.items()])
+                                        [(path, json.dumps(entry, ensure_ascii=False)) for path, entry in entries.items()
+                                         if before.get(path) != entry])
             self.connection.execute("UPDATE meta SET value=? WHERE key='generation'", (str(generation),))
             manifest = {"schema_version": 1, "device_id": metadata["device_id"],
                         "folder_id": metadata["folder_id"], "generation": generation,
-                        "complete": not result.errors and not result.skipped,
-                        "errors": result.errors, "skipped": result.skipped,
+                        "complete": not errors and not excluded,
+                        "errors": errors, "skipped": excluded,
                         "entries": [entries[key] for key in sorted(entries)]}
             self.connection.execute("INSERT OR REPLACE INTO meta VALUES ('last_manifest', ?)",
                                     (json.dumps(manifest, ensure_ascii=False),))
