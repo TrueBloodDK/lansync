@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import sys
 import sqlite3
+import logging
 
 from .manifest import export_manifest
 from .scanner import scan_tree
@@ -28,10 +29,16 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="LANSync filesystem index")
     parser.add_argument("--version", action="version", version="LANSync 0.1.0")
     commands = parser.add_subparsers(dest="command", required=True)
-    scan = commands.add_parser("scan", help="Scan a folder and export its manifest")
-    scan.add_argument("root", type=Path)
-    scan.add_argument("--state-dir", type=Path)
-    scan.add_argument("--manifest", type=Path)
+    for name, help_text in (("scan", "Scan a folder and export its manifest"),
+                            ("watch", "Watch a folder and keep its manifest updated")):
+        command = commands.add_parser(name, help=help_text)
+        command.add_argument("root", type=Path)
+        command.add_argument("--state-dir", type=Path)
+        command.add_argument("--manifest", type=Path)
+        if name == "watch":
+            command.add_argument("--debounce", type=float, default=0.5, help="Quiet period in seconds (default: 0.5)")
+            command.add_argument("--interval", type=float, default=60, help="Periodic scan interval (default: 60)")
+            command.add_argument("--max-delay", type=float, default=5, help="Maximum event batching time (default: 5)")
     args = parser.parse_args(argv)
     try:
         root = args.root.expanduser().resolve(strict=True)
@@ -44,6 +51,16 @@ def main(argv=None):
         database = state / "index.sqlite3"
         if destination == database or destination.name in {"index.sqlite3-journal", "index.sqlite3-wal", "index.sqlite3-shm"} and destination.parent == state:
             raise ValueError("Manifest cannot overwrite database files")
+        if args.command == "watch":
+            from .watcher import watch
+            logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+            print(f"Watching: {root}; stop with Ctrl+C", flush=True)
+            try:
+                watch(root, database, destination, debounce=args.debounce,
+                      interval=args.interval, max_delay=args.max_delay)
+            except KeyboardInterrupt:
+                print("Watching stopped.")
+            return 0
         store = Store(database, root)
         try:
             result = scan_tree(root)
