@@ -12,6 +12,7 @@ from watchdog.observers import Observer
 from .manifest import export_manifest
 from .scanner import scan_tree, scan_paths
 from .storage import Store
+from .policy import validate_patterns
 
 LOG = logging.getLogger(__name__)
 
@@ -46,13 +47,14 @@ def positive_seconds(value):
 
 
 def watch(root, database, destination, *, debounce=0.5, interval=60.0,
-          max_delay=5.0, stop=None, observer_factory=Observer, on_scan=None):
+          max_delay=5.0, stop=None, observer_factory=Observer, on_scan=None, exclude_patterns=()):
     """Run until stopped; all database operations stay in the calling thread.
 
     Events arriving during a scan remain queued for the next pass. Full scans
     also run periodically even without events. Read failures retry then.
     """
     debounce, interval, max_delay = map(positive_seconds, (debounce, interval, max_delay))
+    patterns = validate_patterns(exclude_patterns)
     stop = stop if stop is not None else Event()
     pending = Queue(maxsize=4096)
     handler = ChangeHandler(pending)
@@ -63,12 +65,12 @@ def watch(root, database, destination, *, debounce=0.5, interval=60.0,
         observer.start()  # Start before the first scan to cover initialization.
 
         def reconcile(paths=None):
-            result = scan_tree(root) if paths is None else scan_paths(root, paths)
+            result = scan_tree(root, patterns) if paths is None else scan_paths(root, paths, patterns)
             manifest = store.update(result)
             export_manifest(manifest, destination)
             LOG.info("Scan %s: %s objects, %s errors, %s skipped",
                      manifest["generation"], len(result.entries), len(result.errors), len(result.skipped))
-            for error in result.errors:
+            for error in manifest["errors"] + manifest["portability_errors"]:
                 LOG.warning("%s: %s", error["path"], error["message"])
             if on_scan is not None:
                 on_scan(manifest)

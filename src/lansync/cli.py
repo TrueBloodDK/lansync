@@ -9,6 +9,7 @@ import logging
 from .manifest import export_manifest
 from .scanner import scan_tree
 from .storage import Store
+from .policy import validate_patterns
 
 
 def default_state(root):
@@ -35,12 +36,15 @@ def main(argv=None):
         command.add_argument("root", type=Path)
         command.add_argument("--state-dir", type=Path)
         command.add_argument("--manifest", type=Path)
+        command.add_argument("--exclude", action="append", default=[], metavar="PATTERN",
+                             help="Exclude matching names or relative paths; repeatable")
         if name == "watch":
             command.add_argument("--debounce", type=float, default=0.5, help="Quiet period in seconds (default: 0.5)")
             command.add_argument("--interval", type=float, default=60, help="Periodic scan interval (default: 60)")
             command.add_argument("--max-delay", type=float, default=5, help="Maximum event batching time (default: 5)")
     args = parser.parse_args(argv)
     try:
+        patterns = validate_patterns(args.exclude)
         root = args.root.expanduser().resolve(strict=True)
         if not root.is_dir():
             raise ValueError("Root must be a directory")
@@ -57,13 +61,13 @@ def main(argv=None):
             print(f"Watching: {root}; stop with Ctrl+C", flush=True)
             try:
                 watch(root, database, destination, debounce=args.debounce,
-                      interval=args.interval, max_delay=args.max_delay)
+                      interval=args.interval, max_delay=args.max_delay, exclude_patterns=patterns)
             except KeyboardInterrupt:
                 print("Watching stopped.")
             return 0
         store = Store(database, root)
         try:
-            result = scan_tree(root)
+            result = scan_tree(root, patterns)
             manifest = store.update(result)
             export_manifest(manifest, destination)
         finally:
@@ -71,7 +75,7 @@ def main(argv=None):
         files = sum(entry["kind"] == "file" for entry in result.entries.values())
         print(f"Files: {files}; directories: {len(result.entries) - files}; errors: {len(result.errors)}; skipped: {len(result.skipped)}")
         print(f"Manifest: {destination}")
-        for error in result.errors:
+        for error in manifest["errors"] + manifest["portability_errors"]:
             print(f"{error['path']}: {error['message']}", file=sys.stderr)
         return 0 if manifest["complete"] else 2
     except (OSError, ValueError, sqlite3.Error) as exc:

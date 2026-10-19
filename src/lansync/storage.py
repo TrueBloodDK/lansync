@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import sqlite3
 import uuid
+from .policy import excluded as is_excluded, portability_errors
 
 
 class Store:
@@ -37,13 +38,16 @@ class Store:
                 return result.scopes is None or any(path == scope or path.startswith(scope + "/") for scope in result.scopes)
 
             previous = json.loads(metadata.get("last_manifest", "{}"))
+            if result.scopes is not None and tuple(previous.get("exclude_patterns", ())) != result.exclude_patterns:
+                raise ValueError("Changing exclusion rules requires a full scan")
             errors = result.errors + [item for item in previous.get("errors", []) if not covered(item["path"])]
             excluded = result.skipped + [item for item in previous.get("skipped", []) if not covered(item["path"])]
+            errors = [item for item in errors if not is_excluded(item["path"], result.exclude_patterns)]
             # Conservative policy: a partial scan cannot prove any deletion.
             if not result.errors:
                 skipped = [item["path"] for item in result.skipped]
                 for path, entry in entries.items():
-                    protected = any(path == prefix or path.startswith(prefix + "/") for prefix in skipped)
+                    protected = is_excluded(path, result.exclude_patterns) or any(path == prefix or path.startswith(prefix + "/") for prefix in skipped)
                     if covered(path) and path not in result.entries and not protected:
                         entry["deleted"] = True
             entries.update(result.entries)
@@ -52,11 +56,15 @@ class Store:
                                         [(path, json.dumps(entry, ensure_ascii=False)) for path, entry in entries.items()
                                          if before.get(path) != entry])
             self.connection.execute("UPDATE meta SET value=? WHERE key='generation'", (str(generation),))
-            manifest = {"schema_version": 1, "device_id": metadata["device_id"],
+            visible = [entries[key] for key in sorted(entries) if not is_excluded(key, result.exclude_patterns)]
+            portability = portability_errors(visible)
+            manifest = {"schema_version": 2, "device_id": metadata["device_id"],
                         "folder_id": metadata["folder_id"], "generation": generation,
-                        "complete": not errors and not excluded,
+                        "complete": not errors and not any(item["reason"] != "excluded by rule" for item in excluded) and not portability,
+                        "exclude_patterns": list(result.exclude_patterns),
+                        "portability_errors": portability,
                         "errors": errors, "skipped": excluded,
-                        "entries": [entries[key] for key in sorted(entries)]}
+                        "entries": visible}
             self.connection.execute("INSERT OR REPLACE INTO meta VALUES ('last_manifest', ?)",
                                     (json.dumps(manifest, ensure_ascii=False),))
         return manifest

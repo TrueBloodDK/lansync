@@ -5,6 +5,7 @@ import hashlib
 import os
 from pathlib import Path
 import stat
+from .policy import excluded, validate_patterns
 
 
 @dataclass
@@ -13,6 +14,7 @@ class ScanResult:
     errors: list = field(default_factory=list)
     skipped: list = field(default_factory=list)
     scopes: set | None = None  # None means the whole tree was inspected.
+    exclude_patterns: tuple = ()
 
 
 def signature(info):
@@ -41,8 +43,10 @@ def hash_file(path: Path):
     return before, digest.hexdigest()
 
 
-def scan_tree(root: Path) -> ScanResult:
-    result = ScanResult()
+def scan_tree(root: Path, exclude_patterns=(), *, policy_root=None) -> ScanResult:
+    patterns = validate_patterns(exclude_patterns)
+    policy_root = policy_root or root
+    result = ScanResult(exclude_patterns=patterns)
 
     def visit(directory):
         relative = directory.relative_to(root).as_posix()
@@ -55,6 +59,9 @@ def scan_tree(root: Path) -> ScanResult:
         for child in children:
             path = Path(child.path)
             key = path.relative_to(root).as_posix()
+            if excluded(path.relative_to(policy_root).as_posix(), patterns):
+                result.skipped.append({"path": key, "reason": "excluded by rule"})
+                continue
             try:
                 info = child.stat(follow_symlinks=False)
                 is_junction = getattr(path, "is_junction", lambda: False)()
@@ -78,8 +85,9 @@ def scan_tree(root: Path) -> ScanResult:
     return result
 
 
-def scan_paths(root: Path, paths) -> ScanResult:
+def scan_paths(root: Path, paths, exclude_patterns=()) -> ScanResult:
     """Inspect event targets only; directory targets include their descendants."""
+    patterns = validate_patterns(exclude_patterns)
     keys = set()
     for raw in paths:
         path = Path(os.path.abspath(raw))
@@ -88,12 +96,15 @@ def scan_paths(root: Path, paths) -> ScanResult:
         except ValueError:
             continue
         if key == ".":
-            return scan_tree(root)
+            return scan_tree(root, patterns)
         keys.add(key)
     scopes = {key for key in keys if not any(key.startswith(other + "/") for other in keys if other != key)}
-    result = ScanResult(scopes=scopes)
+    result = ScanResult(scopes=scopes, exclude_patterns=patterns)
     for key in sorted(scopes):
         path = root / key
+        if excluded(key, patterns):
+            result.skipped.append({"path": key, "reason": "excluded by rule"})
+            continue
         try:
             # Never follow a link in an event target's ancestor chain.
             ancestors = [root, *[parent for parent in reversed(path.parents) if root in parent.parents]]
@@ -118,7 +129,7 @@ def scan_paths(root: Path, paths) -> ScanResult:
             elif stat.S_ISDIR(info.st_mode):
                 result.entries[key] = {"path": key, "kind": "directory", "size": None,
                                        "mtime_ns": info.st_mtime_ns, "sha256": None, "deleted": False}
-                subtree = scan_tree(path)
+                subtree = scan_tree(path, patterns, policy_root=root)
                 for child, entry in subtree.entries.items():
                     entry["path"] = key + "/" + child
                     result.entries[entry["path"]] = entry
