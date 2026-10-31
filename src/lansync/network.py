@@ -8,6 +8,7 @@ import re
 import ssl
 import stat
 import tempfile
+import unicodedata
 from threading import Lock
 from urllib.parse import urlsplit
 
@@ -18,7 +19,7 @@ from starlette.background import BackgroundTask
 from starlette.responses import StreamingResponse
 
 from .policy import excluded, portability_errors, validate_patterns
-from .scanner import hash_file, scan_tree, signature
+from .scanner import hash_file, scan_tree, scan_paths, signature
 from .storage import Store
 
 BLOCK = 1024 * 1024
@@ -50,6 +51,21 @@ def safe_path(root, relative):
     return current
 
 
+def check_live_spelling(root, relative):
+    """Detect new sibling collisions without hashing unrelated contents."""
+    parent = root
+    for component in relative.split('/'):
+        normalized = unicodedata.normalize('NFC', component).casefold()
+        try:
+            with os.scandir(parent) as siblings:
+                for sibling in siblings:
+                    if sibling.name != component and unicodedata.normalize('NFC', sibling.name).casefold() == normalized:
+                        raise ValueError('Live filesystem contains a case/Unicode name collision')
+        except FileNotFoundError:
+            return
+        parent = parent / component
+
+
 def create_app(root, database, token, exclude_patterns=(), allow_write=False):
     from .sync import apply_change, fingerprint, revision_manifest
     root = Path(root).resolve(strict=True)
@@ -63,20 +79,24 @@ def create_app(root, database, token, exclude_patterns=(), allow_write=False):
     lock = Lock()
     app = FastAPI(openapi_url=None, docs_url=None, redoc_url=None)
     published = {}
+    initialized = False
 
     def authorize(authorization: str | None = Header(default=None)):
         expected = ('Bearer ' + token).encode('utf-8')
         if not hmac.compare_digest((authorization or '').encode('utf-8'), expected):
             raise HTTPException(401, 'Unauthorized')
 
-    def refresh():
+    def refresh(paths=None):
+        nonlocal initialized
         store = Store(database, root)
         try:
-            result = store.update(scan_tree(root, patterns))
+            result = store.update(scan_tree(root, patterns) if paths is None or not initialized
+                                  else scan_paths(root, paths, patterns))
             if not result['complete']:
                 published.clear()
                 raise HTTPException(409, 'Source manifest is incomplete; run scan to inspect errors')
             result = revision_manifest(store, result)
+            initialized = True
         finally:
             store.close()
         result['writable'] = allow_write
@@ -122,7 +142,12 @@ def create_app(root, database, token, exclude_patterns=(), allow_write=False):
 
             def commit():
                 with lock:
-                    latest = refresh()
+                    try:
+                        safe_path(root, path)
+                        check_live_spelling(root, path)
+                    except (OSError, ValueError) as exc:
+                        raise HTTPException(409, 'Filesystem path changed or name collision') from exc
+                    latest = refresh([target])
                     old = next((e for e in latest['entries'] if e['path'] == path), None)
                     if (old or {}).get('revision', 0) != base_revision:
                         raise HTTPException(409, 'Stale base revision')
@@ -137,7 +162,7 @@ def create_app(root, database, token, exclude_patterns=(), allow_write=False):
                         apply_change(root, path, desired, temporary, old, database.parent / 'recovery')
                     except (OSError, ValueError) as exc:
                         raise HTTPException(409, 'Filesystem changed or incompatible object; retry after inspection') from exc
-                    updated = refresh()
+                    updated = refresh([target])
                     entry = next((e for e in updated['entries'] if e['path'] == path), None)
                     if entry is None:
                         raise HTTPException(409, 'Unknown deletion')

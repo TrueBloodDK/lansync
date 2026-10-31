@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import tempfile
 import uuid
+from contextlib import contextmanager
 
 from .manifest import export_manifest
 from .scanner import hash_file, scan_tree
@@ -117,9 +118,11 @@ def fetch_manifest(client):
     return manifest
 
 
-def synchronize(client, root, state):
-    from .network import BLOCK, safe_path
+@contextmanager
+def locked_sync_state(root, state):
     root, state = Path(root).resolve(strict=True), Path(state).resolve()
+    if not root.is_dir():
+        raise ValueError('Sync root must be a directory')
     if state == root or root in state.parents:
         raise ValueError('Sync state must be outside the synchronized folder')
     state.mkdir(parents=True, exist_ok=True)
@@ -130,9 +133,14 @@ def synchronize(client, root, state):
     descriptor = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
     os.close(descriptor)
     try:
-        return _synchronize(client, root, state)
+        yield root, state
     finally:
         lock_path.unlink(missing_ok=True)
+
+
+def synchronize(client, root, state):
+    with locked_sync_state(root, state) as (root, state):
+        return _synchronize(client, root, state)
 
 
 def _synchronize(client, root, state):

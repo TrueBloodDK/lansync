@@ -189,3 +189,69 @@ class SyncTests(unittest.TestCase):
             result = self.sync()
         self.assertEqual(result['conflicts'], ['file'])
         self.assertEqual((self.local / 'file').read_bytes(), b'concurrent local')
+
+    def test_server_update_hashes_only_target_after_initial_manifest(self):
+        from unittest.mock import patch
+        from lansync.scanner import hash_file
+        self.seed()
+        (self.server / 'unrelated').write_bytes(b'unrelated content')
+        revision = self.manifest()['file']['revision']
+        with patch('lansync.scanner.hash_file', wraps=hash_file) as hashing, \
+                patch('lansync.network.scan_tree', side_effect=AssertionError('Unexpected full scan')):
+            response = self.client.put('/v1/change', params={'path': 'file', 'base_revision': revision,
+                'kind': 'file', 'sha256': hashlib.sha256(b'new').hexdigest(), 'size': 3}, content=b'new')
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(hashing.call_args_list)
+        self.assertEqual({call.args[0] for call in hashing.call_args_list}, {self.server / 'file'})
+        self.assertEqual((self.server / 'unrelated').read_bytes(), b'unrelated content')
+
+    def test_new_live_case_collision_is_rejected_without_full_scan(self):
+        self.manifest()
+        (self.server / 'Report').write_bytes(b'new external file')
+        response = self.client.put('/v1/change', params={'path': 'report', 'base_revision': 0,
+            'kind': 'file', 'sha256': hashlib.sha256(b'client').hexdigest(), 'size': 6}, content=b'client')
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual((self.server / 'Report').read_bytes(), b'new external file')
+
+    def test_continuous_sync_reconnects_then_propagates_both_directions(self):
+        import httpx
+        from contextlib import contextmanager
+        from unittest.mock import patch
+        from lansync.sync_loop import continuous_sync
+        self.seed()
+        original = self.client.stream
+        calls = 0
+
+        @contextmanager
+        def reconnecting_stream(*args, **kwargs):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise httpx.ConnectError('offline')
+            with original(*args, **kwargs) as response:
+                yield response
+
+        test = self
+
+        class StopAfterChanges:
+            rounds = 0
+
+            def is_set(self):
+                return self.rounds >= 3
+
+            def wait(self, delay):
+                test.assertTrue((test.state / 'sync.lock').exists())
+                self.rounds += 1
+                if self.rounds == 1:
+                    (test.local / 'file').write_bytes(b'local update')
+                elif self.rounds == 2:
+                    test.assertEqual((test.server / 'file').read_bytes(), b'local update')
+                    (test.server / 'file').write_bytes(b'server update')
+
+        events = []
+        with patch.object(self.client, 'stream', reconnecting_stream):
+            continuous_sync(self.client, self.local, self.state, interval=1, retry_max=4,
+                            stop=StopAfterChanges(), on_event=events.append)
+        self.assertEqual((self.local / 'file').read_bytes(), b'server update')
+        self.assertTrue(any(e['status'] == 'retrying' for e in events))
+        self.assertFalse((self.state / 'sync.lock').exists())

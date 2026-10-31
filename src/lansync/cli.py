@@ -54,6 +54,9 @@ def main(argv=None):
     sync.add_argument('--token-file', type=Path, required=True)
     sync.add_argument('--ca-file', type=Path)
     sync.add_argument('--allow-http', action='store_true')
+    sync.add_argument('--watch', action='store_true', help='Repeat synchronization until Ctrl+C')
+    sync.add_argument('--interval', type=float, default=30, help='Seconds between completed passes (default: 30)')
+    sync.add_argument('--retry-max', type=float, default=300, help='Maximum retry delay (default: 300)')
     for name, help_text in (("scan", "Scan a folder and export its manifest"),
                             ("watch", "Watch a folder and keep its manifest updated")):
         command = commands.add_parser(name, help=help_text)
@@ -122,6 +125,17 @@ def network_command(args):
         if args.command == 'sync':
             from .sync import synchronize
             with make_client(args.url, token, args.ca_file, args.allow_http) as client:
+                if args.watch:
+                    from .sync_loop import continuous_sync
+                    def show(event):
+                        print(f"Sync: {event['status']}", flush=True)
+                        if event.get('error'):
+                            print(event['error'], file=sys.stderr, flush=True)
+                        if event.get('report'):
+                            print(event['report'], flush=True)
+                    continuous_sync(client, root, args.state_dir, interval=args.interval,
+                                    retry_max=args.retry_max, on_event=show)
+                    return 0
                 result = synchronize(client, root, args.state_dir)
             print(f"Uploaded: {result['uploaded']}; downloaded: {result['downloaded']}; deleted locally: {result['deleted_local']}; deleted remotely: {result['deleted_remote']}")
             for path in result['conflicts']:
