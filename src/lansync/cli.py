@@ -30,6 +30,22 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="LANSync filesystem index")
     parser.add_argument("--version", action="version", version="LANSync 0.1.0")
     commands = parser.add_subparsers(dest="command", required=True)
+    serve = commands.add_parser('serve', help='Serve a read-only manifest and files')
+    serve.add_argument('root', type=Path)
+    serve.add_argument('--state-dir', type=Path)
+    serve.add_argument('--token-file', type=Path, required=True)
+    serve.add_argument('--host', default='127.0.0.1')
+    serve.add_argument('--port', type=int, default=8765)
+    serve.add_argument('--cert-file', type=Path)
+    serve.add_argument('--key-file', type=Path)
+    serve.add_argument('--allow-http', action='store_true', help='Local loopback testing only')
+    serve.add_argument('--exclude', action='append', default=[])
+    download = commands.add_parser('pull', help='Download absent files; stop on local conflicts')
+    download.add_argument('url')
+    download.add_argument('root', type=Path)
+    download.add_argument('--token-file', type=Path, required=True)
+    download.add_argument('--ca-file', type=Path)
+    download.add_argument('--allow-http', action='store_true', help='Local loopback testing only')
     for name, help_text in (("scan", "Scan a folder and export its manifest"),
                             ("watch", "Watch a folder and keep its manifest updated")):
         command = commands.add_parser(name, help=help_text)
@@ -43,6 +59,8 @@ def main(argv=None):
             command.add_argument("--interval", type=float, default=60, help="Periodic scan interval (default: 60)")
             command.add_argument("--max-delay", type=float, default=5, help="Maximum event batching time (default: 5)")
     args = parser.parse_args(argv)
+    if args.command in {'serve', 'pull'}:
+        return network_command(args)
     try:
         patterns = validate_patterns(args.exclude)
         root = args.root.expanduser().resolve(strict=True)
@@ -81,3 +99,41 @@ def main(argv=None):
     except (OSError, ValueError, sqlite3.Error) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
+
+
+def network_command(args):
+    import httpx
+    import uvicorn
+    from .network import create_app, make_client, pull, read_token
+    try:
+        root = args.root.expanduser().resolve(strict=True)
+        if not root.is_dir():
+            raise ValueError('Root must be a directory')
+        outside_root(args.token_file.resolve(), root)
+        token = read_token(args.token_file)
+        if args.command == 'pull':
+            with make_client(args.url, token, args.ca_file, args.allow_http) as client:
+                result = pull(client, root)
+            print(f"Downloaded: {result['downloaded']}; unchanged: {result['unchanged']}")
+            return 0
+        state = (args.state_dir or default_state(root)).expanduser().resolve()
+        outside_root(state, root)
+        if not 1 <= args.port <= 65535:
+            raise ValueError('Port must be between 1 and 65535')
+        if bool(args.cert_file) != bool(args.key_file):
+            raise ValueError('Both --cert-file and --key-file are required')
+        if not args.cert_file and not (args.allow_http and args.host in {'127.0.0.1', '::1'}):
+            raise ValueError('TLS certificate required; HTTP testing must bind a literal loopback address')
+        for credential in (args.cert_file, args.key_file):
+            if credential:
+                outside_root(credential.resolve(strict=True), root)
+        app = create_app(root, state / 'index.sqlite3', token, args.exclude)
+        uvicorn.run(app, host=args.host, port=args.port, access_log=False,
+                    ssl_certfile=str(args.cert_file) if args.cert_file else None,
+                    ssl_keyfile=str(args.key_file) if args.key_file else None)
+        return 0
+    except (OSError, ValueError, sqlite3.Error, httpx.HTTPError) as exc:
+        print(f'Error: {exc}', file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        return 0
