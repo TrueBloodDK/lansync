@@ -146,7 +146,8 @@ class NetworkTests(unittest.TestCase):
         listener = socket.socket()
         listener.bind(('127.0.0.1', 0))
         port = listener.getsockname()[1]
-        config = uvicorn.Config(self.app, host='127.0.0.1', port=port, ssl_certfile=str(cert_path),
+        writable_app = create_app(self.source, self.base / 'state/index.sqlite3', TOKEN, allow_write=True)
+        config = uvicorn.Config(writable_app, host='127.0.0.1', port=port, ssl_certfile=str(cert_path),
                                 ssl_keyfile=str(key_path), log_level='error', lifespan='off')
         server = uvicorn.Server(config)
         thread = Thread(target=server.run, kwargs={'sockets': [listener]}, daemon=True)
@@ -162,6 +163,14 @@ class NetworkTests(unittest.TestCase):
                     client.get('/v1/manifest')
             with make_client(url, TOKEN, ca_path) as client:
                 self.assertEqual(pull(client, self.target)['downloaded'], 2)
+                from lansync.sync import synchronize
+                state = self.base / 'sync-state'
+                self.assertFalse(synchronize(client, self.target, state)['conflicts'])
+                (self.target / 'empty').write_bytes(b'uploaded over TLS')
+                self.assertEqual(synchronize(client, self.target, state)['uploaded'], 1)
+                self.assertEqual((self.source / 'empty').read_bytes(), b'uploaded over TLS')
+                (self.source / 'empty').unlink()
+                self.assertEqual(synchronize(client, self.target, state)['deleted_local'], 1)
         finally:
             server.should_exit = True
             thread.join(5)

@@ -40,12 +40,20 @@ def main(argv=None):
     serve.add_argument('--key-file', type=Path)
     serve.add_argument('--allow-http', action='store_true', help='Local loopback testing only')
     serve.add_argument('--exclude', action='append', default=[])
+    serve.add_argument('--allow-write', action='store_true', help='Allow revision-checked uploads and deletions')
     download = commands.add_parser('pull', help='Download absent files; stop on local conflicts')
     download.add_argument('url')
     download.add_argument('root', type=Path)
     download.add_argument('--token-file', type=Path, required=True)
     download.add_argument('--ca-file', type=Path)
     download.add_argument('--allow-http', action='store_true', help='Local loopback testing only')
+    sync = commands.add_parser('sync', help='Reconcile local and server changes using a persistent baseline')
+    sync.add_argument('url')
+    sync.add_argument('root', type=Path)
+    sync.add_argument('--state-dir', type=Path, required=True)
+    sync.add_argument('--token-file', type=Path, required=True)
+    sync.add_argument('--ca-file', type=Path)
+    sync.add_argument('--allow-http', action='store_true')
     for name, help_text in (("scan", "Scan a folder and export its manifest"),
                             ("watch", "Watch a folder and keep its manifest updated")):
         command = commands.add_parser(name, help=help_text)
@@ -59,7 +67,7 @@ def main(argv=None):
             command.add_argument("--interval", type=float, default=60, help="Periodic scan interval (default: 60)")
             command.add_argument("--max-delay", type=float, default=5, help="Maximum event batching time (default: 5)")
     args = parser.parse_args(argv)
-    if args.command in {'serve', 'pull'}:
+    if args.command in {'serve', 'pull', 'sync'}:
         return network_command(args)
     try:
         patterns = validate_patterns(args.exclude)
@@ -111,6 +119,14 @@ def network_command(args):
             raise ValueError('Root must be a directory')
         outside_root(args.token_file.resolve(), root)
         token = read_token(args.token_file)
+        if args.command == 'sync':
+            from .sync import synchronize
+            with make_client(args.url, token, args.ca_file, args.allow_http) as client:
+                result = synchronize(client, root, args.state_dir)
+            print(f"Uploaded: {result['uploaded']}; downloaded: {result['downloaded']}; deleted locally: {result['deleted_local']}; deleted remotely: {result['deleted_remote']}")
+            for path in result['conflicts']:
+                print(f'Conflict: {path}', file=sys.stderr)
+            return 2 if result['conflicts'] else 0
         if args.command == 'pull':
             with make_client(args.url, token, args.ca_file, args.allow_http) as client:
                 result = pull(client, root)
@@ -127,7 +143,7 @@ def network_command(args):
         for credential in (args.cert_file, args.key_file):
             if credential:
                 outside_root(credential.resolve(strict=True), root)
-        app = create_app(root, state / 'index.sqlite3', token, args.exclude)
+        app = create_app(root, state / 'index.sqlite3', token, args.exclude, allow_write=args.allow_write)
         uvicorn.run(app, host=args.host, port=args.port, access_log=False,
                     ssl_certfile=str(args.cert_file) if args.cert_file else None,
                     ssl_keyfile=str(args.key_file) if args.key_file else None)

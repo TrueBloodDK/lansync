@@ -12,7 +12,8 @@ from threading import Lock
 from urllib.parse import urlsplit
 
 import httpx
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from starlette.concurrency import run_in_threadpool
 from starlette.background import BackgroundTask
 from starlette.responses import StreamingResponse
 
@@ -49,11 +50,15 @@ def safe_path(root, relative):
     return current
 
 
-def create_app(root, database, token, exclude_patterns=()):
+def create_app(root, database, token, exclude_patterns=(), allow_write=False):
+    from .sync import apply_change, fingerprint, revision_manifest
     root = Path(root).resolve(strict=True)
     database = Path(database).resolve()
     if not root.is_dir() or root == database or root in database.parents:
         raise ValueError('Database must be outside the shared directory')
+    database.parent.mkdir(parents=True, exist_ok=True)
+    if allow_write and database.parent.stat().st_dev != root.stat().st_dev:
+        raise ValueError('Writable server state and root must be on the same volume')
     patterns = validate_patterns(exclude_patterns)
     lock = Lock()
     app = FastAPI(openapi_url=None, docs_url=None, redoc_url=None)
@@ -64,20 +69,84 @@ def create_app(root, database, token, exclude_patterns=()):
         if not hmac.compare_digest((authorization or '').encode('utf-8'), expected):
             raise HTTPException(401, 'Unauthorized')
 
-    @app.get('/v1/manifest', dependencies=[Depends(authorize)])
-    def manifest():
-        with lock:
-            store = Store(database, root)
-            try:
-                result = store.update(scan_tree(root, patterns))
-            finally:
-                store.close()
+    def refresh():
+        store = Store(database, root)
+        try:
+            result = store.update(scan_tree(root, patterns))
             if not result['complete']:
                 published.clear()
                 raise HTTPException(409, 'Source manifest is incomplete; run scan to inspect errors')
-            published.clear()
-            published.update({e['path']: e for e in result['entries'] if not e['deleted']})
-            return result
+            result = revision_manifest(store, result)
+        finally:
+            store.close()
+        result['writable'] = allow_write
+        published.clear()
+        published.update({e['path']: e for e in result['entries'] if not e['deleted']})
+        return result
+
+    @app.get('/v1/manifest', dependencies=[Depends(authorize)])
+    def manifest():
+        with lock:
+            return refresh()
+
+    @app.put('/v1/change', dependencies=[Depends(authorize)])
+    async def change(request: Request, path: str, base_revision: int, kind: str, sha256: str = '', size: int = 0):
+        if not allow_write:
+            raise HTTPException(403, 'Server is read-only')
+        try:
+            target = safe_path(root, path)
+        except (OSError, ValueError) as exc:
+            raise HTTPException(400, 'Invalid path') from exc
+        if excluded(path, patterns):
+            raise HTTPException(403, 'Excluded path')
+        if (base_revision < 0 or kind not in {'file', 'directory', 'deleted'} or size < 0
+                or (kind == 'file' and not re.fullmatch('[0-9a-f]{64}', sha256))
+                or (kind != 'file' and size != 0)):
+            raise HTTPException(400, 'Invalid change metadata')
+        database.parent.mkdir(parents=True, exist_ok=True)
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(dir=database.parent, prefix='upload-', delete=False) as stream:
+                temporary = Path(stream.name)
+                digest, received = hashlib.sha256(), 0
+                async for chunk in request.stream():
+                    received += len(chunk)
+                    if received > size:
+                        raise HTTPException(400, 'Upload exceeds advertised size')
+                    digest.update(chunk)
+                    stream.write(chunk)
+                if received != size or (kind == 'file' and digest.hexdigest() != sha256):
+                    raise HTTPException(400, 'Upload size/hash mismatch')
+                stream.flush()
+                os.fsync(stream.fileno())
+
+            def commit():
+                with lock:
+                    latest = refresh()
+                    old = next((e for e in latest['entries'] if e['path'] == path), None)
+                    if (old or {}).get('revision', 0) != base_revision:
+                        raise HTTPException(409, 'Stale base revision')
+                    desired = None if kind == 'deleted' else {'path': path, 'kind': kind,
+                              'sha256': sha256 if kind == 'file' else None, 'size': size, 'deleted': False}
+                    candidates = [e for e in latest['entries'] if e['path'] != path]
+                    if desired:
+                        candidates.append(desired)
+                    if portability_errors(candidates):
+                        raise HTTPException(409, 'Name collision')
+                    try:
+                        apply_change(root, path, desired, temporary, old, database.parent / 'recovery')
+                    except (OSError, ValueError) as exc:
+                        raise HTTPException(409, 'Filesystem changed or incompatible object; retry after inspection') from exc
+                    updated = refresh()
+                    entry = next((e for e in updated['entries'] if e['path'] == path), None)
+                    if entry is None:
+                        raise HTTPException(409, 'Unknown deletion')
+                    return {'entry': entry}
+
+            return await run_in_threadpool(commit)
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
 
     @app.get('/v1/file', dependencies=[Depends(authorize)])
     def file(path: str, sha256: str):
