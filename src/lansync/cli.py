@@ -30,6 +30,9 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="LANSync filesystem index")
     parser.add_argument("--version", action="version", version="LANSync 0.1.0")
     commands = parser.add_subparsers(dest="command", required=True)
+    status = commands.add_parser('status', help='Inspect saved synchronization reports')
+    status.add_argument('--state-dir', type=Path, required=True)
+    status.add_argument('--json', action='store_true', help='Print machine-readable JSON')
     run = commands.add_parser('run', help='Run a command from a TOML configuration')
     run.add_argument('config', type=Path)
     serve = commands.add_parser('serve', help='Serve a read-only manifest and files')
@@ -72,6 +75,13 @@ def main(argv=None):
             command.add_argument("--interval", type=float, default=60, help="Periodic scan interval (default: 60)")
             command.add_argument("--max-delay", type=float, default=5, help="Maximum event batching time (default: 5)")
     args = parser.parse_args(argv)
+    if args.command == 'status':
+        from .status import show_status
+        try:
+            return show_status(args.state_dir, as_json=args.json)
+        except (OSError, ValueError) as exc:
+            print(f'Error: {exc}', file=sys.stderr)
+            return 1
     if args.command == 'run':
         from .config import load_arguments
         try:
