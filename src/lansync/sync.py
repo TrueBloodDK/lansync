@@ -143,7 +143,18 @@ def synchronize(client, root, state):
         return _synchronize(client, root, state)
 
 
-def _synchronize(client, root, state):
+def resolve_conflict(client, root, state, key, choice):
+    if choice not in {'local', 'remote'}:
+        raise ValueError('Choose local or remote')
+    with locked_sync_state(root, state) as (root, state):
+        report = json.loads((state / 'last-sync.json').read_text(encoding='utf-8'))
+        snapshot = report.get('conflict_versions', {}).get(key)
+        if key not in report.get('conflicts', []) or snapshot is None:
+            raise ValueError('No recorded conflict snapshot; run sync first')
+        return _synchronize(client, root, state, resolution=(key, choice, snapshot))
+
+
+def _synchronize(client, root, state, resolution=None):
     from .network import BLOCK, safe_path
     from .policy import excluded, portability_errors
     remote_manifest = fetch_manifest(client)
@@ -165,7 +176,22 @@ def _synchronize(client, root, state):
     name_conflicts = sorted({e['path'] for e in portability_errors(list(combined.values()))})
     report = {'uploaded': 0, 'downloaded': 0, 'deleted_local': 0, 'deleted_remote': 0, 'conflicts': name_conflicts}
     actions = []
+    if resolution:
+        key, choice, snapshot = resolution
+        safe_path(root, key)
+        left, right = local.get(key), remote.get(key)
+        if (fingerprint(left) != fingerprint(snapshot.get('local')) or
+                fingerprint(right) != fingerprint(snapshot.get('remote')) or
+                (right or {}).get('revision', 0) != (snapshot.get('remote') or {}).get('revision', 0)):
+            raise ValueError('Conflict changed since detection; run sync and review again')
+        if excluded(key, patterns) or any(key == p or key.startswith(p + '/') for p in name_conflicts):
+            raise ValueError('Excluded paths and name collisions require manual resolution')
+        if any(e and not e.get('deleted') and e['kind'] != 'file' for e in (left, right)):
+            raise ValueError('Directory conflicts require manual resolution')
+        actions.append(('upload' if choice == 'local' else 'download', key, left, right))
     for key in sorted(set(local) | set(remote) | set(baseline)):
+        if resolution:
+            continue
         if excluded(key, patterns):
             continue
         if any(key == conflict or key.startswith(conflict + '/') for conflict in name_conflicts):
@@ -257,5 +283,15 @@ def _synchronize(client, root, state):
             if temporary is not None:
                 temporary.unlink(missing_ok=True)
     export_manifest(saved, baseline_file)
+    if resolution:
+        previous = json.loads((state / 'last-sync.json').read_text(encoding='utf-8'))
+        remaining = [p for p in previous.get('conflicts', []) if p != resolution[0]]
+        report['conflicts'] = sorted(set(remaining + report['conflicts']))
+    report['conflict_versions'] = {key: {'local': local.get(key), 'remote': remote.get(key)}
+                                   for key in report['conflicts']}
+    if resolution:
+        for key in remaining:
+            if key in previous.get('conflict_versions', {}):
+                report['conflict_versions'][key] = previous['conflict_versions'][key]
     export_manifest(report, state / 'last-sync.json')
     return report

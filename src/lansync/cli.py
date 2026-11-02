@@ -62,6 +62,15 @@ def main(argv=None):
     sync.add_argument('--watch', action='store_true', help='Repeat synchronization until Ctrl+C')
     sync.add_argument('--interval', type=float, default=30, help='Seconds between completed passes (default: 30)')
     sync.add_argument('--retry-max', type=float, default=300, help='Maximum retry delay (default: 300)')
+    resolve = commands.add_parser('resolve', help='Resolve one recorded file conflict')
+    resolve.add_argument('url')
+    resolve.add_argument('root', type=Path)
+    resolve.add_argument('path', help='Relative conflicted file path')
+    resolve.add_argument('--choose', choices=['local', 'remote'], required=True)
+    resolve.add_argument('--state-dir', type=Path, required=True)
+    resolve.add_argument('--token-file', type=Path, required=True)
+    resolve.add_argument('--ca-file', type=Path)
+    resolve.add_argument('--allow-http', action='store_true')
     for name, help_text in (("scan", "Scan a folder and export its manifest"),
                             ("watch", "Watch a folder and keep its manifest updated")):
         command = commands.add_parser(name, help=help_text)
@@ -89,7 +98,7 @@ def main(argv=None):
         except (OSError, ValueError) as exc:
             print(f'Error: {exc}', file=sys.stderr)
             return 1
-    if args.command in {'serve', 'pull', 'sync'}:
+    if args.command in {'serve', 'pull', 'sync', 'resolve'}:
         return network_command(args)
     try:
         patterns = validate_patterns(args.exclude)
@@ -141,6 +150,12 @@ def network_command(args):
             raise ValueError('Root must be a directory')
         outside_root(args.token_file.resolve(), root)
         token = read_token(args.token_file)
+        if args.command == 'resolve':
+            from .sync import resolve_conflict
+            with make_client(args.url, token, args.ca_file, args.allow_http) as client:
+                result = resolve_conflict(client, root, args.state_dir, args.path, args.choose)
+            print(result)
+            return 2 if result['conflicts'] else 0
         if args.command == 'sync':
             from .sync import synchronize
             with make_client(args.url, token, args.ca_file, args.allow_http) as client:

@@ -255,3 +255,34 @@ class SyncTests(unittest.TestCase):
         self.assertEqual((self.local / 'file').read_bytes(), b'server update')
         self.assertTrue(any(e['status'] == 'retrying' for e in events))
         self.assertFalse((self.state / 'sync.lock').exists())
+
+    def test_resolve_local_and_remote_with_recovery(self):
+        from lansync.sync import resolve_conflict
+        self.seed()
+        for choice in ('local', 'remote'):
+            (self.local / 'file').write_bytes(b'local choice')
+            (self.server / 'file').write_bytes(b'remote choice')
+            self.assertIn('file', self.sync()['conflicts'])
+            result = resolve_conflict(self.client, self.local, self.state, 'file', choice)
+            self.assertFalse(result['conflicts'])
+            expected = b'local choice' if choice == 'local' else b'remote choice'
+            self.assertEqual((self.local / 'file').read_bytes(), expected)
+            self.assertEqual((self.server / 'file').read_bytes(), expected)
+            recovery = self.database.parent / 'recovery' if choice == 'local' else self.state / 'recovery'
+            rejected = b'remote choice' if choice == 'local' else b'local choice'
+            self.assertIn(rejected, [p.read_bytes() for p in recovery.glob('*.bak')])
+            # Establish a different common baseline for the next conflict.
+            (self.local / 'file').write_bytes(b'base again')
+            self.sync()
+
+    def test_resolution_rejects_changed_snapshot(self):
+        from lansync.sync import resolve_conflict
+        self.seed()
+        (self.local / 'file').write_bytes(b'local')
+        (self.server / 'file').write_bytes(b'remote')
+        self.sync()
+        (self.server / 'file').write_bytes(b'newer remote')
+        with self.assertRaisesRegex(ValueError, 'changed since detection'):
+            resolve_conflict(self.client, self.local, self.state, 'file', 'local')
+        self.assertEqual((self.server / 'file').read_bytes(), b'newer remote')
+        self.assertEqual((self.local / 'file').read_bytes(), b'local')
