@@ -317,3 +317,38 @@ class SyncTests(unittest.TestCase):
         self.assertEqual(result['conflict_versions']['other'], previous['conflict_versions']['other'])
         self.assertFalse((self.server / 'file').exists())
         self.assertIn(b'edited', [p.read_bytes() for p in (self.database.parent / 'recovery').glob('*.bak')])
+
+    def test_dry_run_matches_actions_without_writes(self):
+        self.seed()
+        (self.local / 'file').write_bytes(b'changed')
+        (self.server / 'new').write_bytes(b'remote')
+        before = {p.relative_to(self.state): p.read_bytes() for p in self.state.rglob('*') if p.is_file()}
+        result = synchronize(self.client, self.local, self.state, dry_run=True)
+        self.assertEqual({(a['operation'], a['path']) for a in result['planned']}, {('upload', 'file'), ('download', 'new')})
+        self.assertEqual((self.server / 'file').read_bytes(), b'base')
+        self.assertFalse((self.local / 'new').exists())
+        self.assertEqual(before, {p.relative_to(self.state): p.read_bytes() for p in self.state.rglob('*') if p.is_file()})
+        actual = self.sync()
+        self.assertEqual(actual['uploaded'], 1)
+        self.assertEqual(actual['downloaded'], 1)
+
+    def test_dry_run_first_contact_creates_no_state(self):
+        (self.server / 'file').write_bytes(b'data')
+        result = synchronize(self.client, self.local, self.state, dry_run=True)
+        self.assertEqual(result['planned'][0]['operation'], 'download')
+        self.assertFalse(self.state.exists())
+        self.assertEqual(list(self.local.iterdir()), [])
+
+    def test_dry_run_deletion_conflict_and_lock(self):
+        from lansync.sync import locked_sync_state
+        self.seed()
+        (self.local / 'file').unlink()
+        plan = synchronize(self.client, self.local, self.state, dry_run=True)
+        self.assertEqual(plan['planned'][0]['operation'], 'delete_remote')
+        (self.server / 'file').write_bytes(b'edited')
+        plan = synchronize(self.client, self.local, self.state, dry_run=True)
+        self.assertEqual(plan['conflicts'], ['file'])
+        self.assertEqual(plan['planned'], [])
+        with locked_sync_state(self.local, self.state):
+            with self.assertRaisesRegex(ValueError, 'locked'):
+                synchronize(self.client, self.local, self.state, dry_run=True)

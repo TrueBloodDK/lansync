@@ -138,7 +138,14 @@ def locked_sync_state(root, state):
         lock_path.unlink(missing_ok=True)
 
 
-def synchronize(client, root, state):
+def synchronize(client, root, state, *, dry_run=False):
+    if dry_run:
+        root, state = Path(root).expanduser().resolve(strict=True), Path(state).expanduser().resolve()
+        if not root.is_dir() or state == root or root in state.parents:
+            raise ValueError('Root must be a directory and state must be outside it')
+        if (state / 'sync.lock').exists():
+            raise ValueError('Sync state is locked; stop the running sync first')
+        return _synchronize(client, root, state, dry_run=True)
     with locked_sync_state(root, state) as (root, state):
         return _synchronize(client, root, state)
 
@@ -154,7 +161,7 @@ def resolve_conflict(client, root, state, key, choice):
         return _synchronize(client, root, state, resolution=(key, choice, snapshot))
 
 
-def _synchronize(client, root, state, resolution=None):
+def _synchronize(client, root, state, resolution=None, dry_run=False):
     from .network import BLOCK, safe_path
     from .policy import excluded, portability_errors
     remote_manifest = fetch_manifest(client)
@@ -218,6 +225,20 @@ def _synchronize(client, root, state, resolution=None):
         direction, key, left, right = action
         desired = left if direction == 'upload' else right
         return (1, -key.count('/'), key) if fingerprint(desired) is None else (0, key.count('/'), key)
+    if dry_run:
+        plan = []
+        for direction, key, left, right in sorted(actions, key=order):
+            desired = left if direction == 'upload' else right
+            existing = right if direction == 'upload' else left
+            if (fingerprint(desired) and fingerprint(existing) and desired['kind'] != existing['kind']) or any(
+                    key.startswith(parent + '/') for parent in report['conflicts']):
+                report['conflicts'].append(key)
+                continue
+            operation = direction if fingerprint(desired) else ('delete_remote' if direction == 'upload' else 'delete_local')
+            plan.append({'path': key, 'operation': operation, 'kind': (desired or existing or {}).get('kind')})
+        report['dry_run'] = True
+        report['planned'] = plan
+        return report
     for direction, key, left, right in sorted(actions, key=order):
         desired = left if direction == 'upload' else right
         existing = right if direction == 'upload' else left

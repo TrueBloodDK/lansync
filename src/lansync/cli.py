@@ -69,6 +69,7 @@ def main(argv=None):
     sync.add_argument('--ca-file', type=Path)
     sync.add_argument('--allow-http', action='store_true')
     sync.add_argument('--watch', action='store_true', help='Repeat synchronization until Ctrl+C')
+    sync.add_argument('--dry-run', action='store_true', help='Preview changes without transferring files or saving client state')
     sync.add_argument('--interval', type=float, default=30, help='Seconds between completed passes (default: 30)')
     sync.add_argument('--retry-max', type=float, default=300, help='Maximum retry delay (default: 300)')
     resolve = commands.add_parser('resolve', help='Resolve one recorded file conflict')
@@ -186,6 +187,8 @@ def network_command(args):
             return 2 if result['conflicts'] else 0
         if args.command == 'sync':
             from .sync import synchronize
+            if args.dry_run and args.watch:
+                raise ValueError('--dry-run cannot be combined with --watch')
             with make_client(args.url, token, args.ca_file, args.allow_http) as client:
                 if args.watch:
                     from .sync_loop import continuous_sync
@@ -198,7 +201,15 @@ def network_command(args):
                     continuous_sync(client, root, args.state_dir, interval=args.interval,
                                     retry_max=args.retry_max, on_event=show)
                     return 0
-                result = synchronize(client, root, args.state_dir)
+                result = synchronize(client, root, args.state_dir, dry_run=args.dry_run)
+            if args.dry_run:
+                print('Preview only; files may change before the actual sync.')
+                for action in result['planned']:
+                    print(f"{action['operation']}: {action['path']}")
+                for path in result['conflicts']:
+                    print(f'Conflict: {path}', file=sys.stderr)
+                print(f"Planned: {len(result['planned'])}; conflicts: {len(result['conflicts'])}")
+                return 2 if result['conflicts'] else 0
             print(f"Uploaded: {result['uploaded']}; downloaded: {result['downloaded']}; deleted locally: {result['deleted_local']}; deleted remotely: {result['deleted_remote']}")
             for path in result['conflicts']:
                 print(f'Conflict: {path}', file=sys.stderr)
