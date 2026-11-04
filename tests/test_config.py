@@ -135,3 +135,21 @@ class ConfigTests(unittest.TestCase):
                     if action=='recovery-restore':
                         self.assertIn('--output='+str(base/'restored'),args)
             self.assertEqual(list(base.iterdir()),[config])
+
+    def test_run_parses_cli_only_once(self):
+        import argparse
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as tmp:
+            base=Path(tmp); (base/'shared').mkdir()
+            config=base/'scan.toml'
+            config.write_text('command="scan"\nroot="shared"\nstate_dir="state"\nlog_file="run.log"\n')
+            original=argparse.ArgumentParser.parse_args
+            calls=[]
+            def counted(parser,*args,**kwargs):
+                calls.append(1)
+                return original(parser,*args,**kwargs)
+            with patch.object(argparse.ArgumentParser,'parse_args',counted), contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main(['run',str(config)]),0)
+            self.assertEqual(len(calls),1)
+            self.assertTrue((base/'state/manifest.json').exists())
+            self.assertTrue((base/'run.log').exists())

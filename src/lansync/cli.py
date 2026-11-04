@@ -60,35 +60,26 @@ def main(argv=None):
     run.add_argument('--path', help='Relative conflict path for resolve')
     run.add_argument('--choose', choices=['local', 'remote'])
     run.add_argument('--json', action='store_true', help='Structured output for plan, status, doctor or recovery')
-    serve = commands.add_parser('serve', help='Serve a read-only manifest and files')
-    serve.add_argument('root', type=Path)
-    serve.add_argument('--state-dir', type=Path)
-    serve.add_argument('--token-file', type=Path, required=True)
-    serve.add_argument('--host', default='127.0.0.1')
-    serve.add_argument('--port', type=int, default=8765)
-    serve.add_argument('--cert-file', type=Path)
-    serve.add_argument('--key-file', type=Path)
-    serve.add_argument('--allow-http', action='store_true', help='Local loopback testing only')
-    serve.add_argument('--exclude', action='append', default=[])
-    serve.add_argument('--allow-write', action='store_true', help='Allow revision-checked uploads and deletions')
-    download = commands.add_parser('pull', help='Download absent files; stop on local conflicts')
-    download.add_argument('url')
-    download.add_argument('root', type=Path)
-    download.add_argument('--token-file', type=Path, required=True)
-    download.add_argument('--ca-file', type=Path)
-    download.add_argument('--allow-http', action='store_true', help='Local loopback testing only')
-    sync = commands.add_parser('sync', help='Reconcile local and server changes using a persistent baseline')
-    sync.add_argument('url')
-    sync.add_argument('root', type=Path)
-    sync.add_argument('--state-dir', type=Path, required=True)
-    sync.add_argument('--token-file', type=Path, required=True)
-    sync.add_argument('--ca-file', type=Path)
-    sync.add_argument('--allow-http', action='store_true')
-    sync.add_argument('--watch', action='store_true', help='Repeat synchronization until Ctrl+C')
-    sync.add_argument('--dry-run', action='store_true', help='Preview changes without transferring files or saving client state')
-    sync.add_argument('--json', action='store_true', help='Print the dry-run plan as JSON (requires --dry-run)')
-    sync.add_argument('--interval', type=float, default=30, help='Seconds between completed passes (default: 30)')
-    sync.add_argument('--retry-max', type=float, default=300, help='Maximum retry delay (default: 300)')
+    from .config import SCHEMAS, REQUIRED
+    for name, schema in SCHEMAS.items():
+        command = commands.add_parser(name, allow_abbrev=False)
+        positional = ('url', 'root') if name in {'sync', 'pull'} else ('root',)
+        for key in positional:
+            command.add_argument(key, type=schema[key][0])
+        for key, (kind, default) in schema.items():
+            if key in positional:
+                continue
+            flag = '--' + key.replace('_', '-')
+            kwargs = {'default': list(default) if kind is list else default}
+            if key in REQUIRED[name]:
+                kwargs['required'] = True
+            if kind is bool:
+                kwargs['action'] = 'store_true'
+            elif kind is list:
+                kwargs['action'] = 'append'
+            else:
+                kwargs['type'] = kind
+            command.add_argument(flag, **kwargs)
     resolve = commands.add_parser('resolve', help='Resolve one recorded file conflict')
     resolve.add_argument('url')
     resolve.add_argument('root', type=Path)
@@ -98,23 +89,14 @@ def main(argv=None):
     resolve.add_argument('--token-file', type=Path, required=True)
     resolve.add_argument('--ca-file', type=Path)
     resolve.add_argument('--allow-http', action='store_true')
-    for name, help_text in (("scan", "Scan a folder and export its manifest"),
-                            ("watch", "Watch a folder and keep its manifest updated")):
-        command = commands.add_parser(name, help=help_text)
-        command.add_argument("root", type=Path)
-        command.add_argument("--state-dir", type=Path)
-        command.add_argument("--manifest", type=Path)
-        command.add_argument("--exclude", action="append", default=[], metavar="PATTERN",
-                             help="Exclude matching names or relative paths; repeatable")
-        if name == "watch":
-            command.add_argument("--debounce", type=float, default=0.5, help="Quiet period in seconds (default: 0.5)")
-            command.add_argument("--interval", type=float, default=60, help="Periodic scan interval (default: 60)")
-            command.add_argument("--max-delay", type=float, default=5, help="Maximum event batching time (default: 5)")
-    for name in ('scan', 'watch', 'serve', 'pull', 'sync', 'resolve'):
-        commands.choices[name].allow_abbrev = False
-        commands.choices[name].add_argument('--log-file', type=Path, help='New log file outside synchronized and state folders')
+    resolve.add_argument('--log-file', type=Path)
+    resolve.allow_abbrev = False
     raw_args = list(sys.argv[1:] if argv is None else argv)
     args = parser.parse_args(raw_args)
+    return execute(args)
+
+
+def execute(args):
     if args.command == 'doctor':
         import json
         from .diagnostics import diagnose
@@ -135,19 +117,17 @@ def main(argv=None):
         from .config import load_project
         try:
             project = load_project(args.config)
-            arguments = project.arguments()
             configured = project.namespace()
             from .options import validate_options
             validate_options(configured)
-            from .workflow import action_arguments
-            arguments = action_arguments(configured, args, arguments)
+            from .workflow import prepare_action
+            configured = prepare_action(configured, args)
             if args.check:
-                configured = parser.parse_args(arguments)
                 from .options import validate_options
                 validate_options(configured)
                 print(f'Configuration syntax OK: {configured.command}; paths, credentials and connectivity were not checked.')
                 return 0
-            return main(arguments)
+            return execute(configured)
         except (OSError, ValueError) as exc:
             print(f'Error: {exc}', file=sys.stderr)
             return 1
@@ -167,18 +147,10 @@ def main(argv=None):
             if getattr(args, 'token_file', None):
                 from .network import read_token
                 secrets.append(read_token(args.token_file))
-            cleaned = []
-            iterator = iter(raw_args)
-            for item in iterator:
-                if item == '--':
-                    cleaned.extend([item, *iterator])
-                    break
-                if item == '--log-file':
-                    next(iterator)
-                elif not item.startswith('--log-file='):
-                    cleaned.append(item)
+            from types import SimpleNamespace
+            unlogged = SimpleNamespace(**{**vars(args), 'log_file': None})
             with transcript(path, secrets):
-                code = main(cleaned)
+                code = execute(unlogged)
                 print(f'LANSync exit code: {code}', file=sys.stderr)
                 return code
         except (OSError, ValueError) as exc:
