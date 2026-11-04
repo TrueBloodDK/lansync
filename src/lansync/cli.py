@@ -30,6 +30,15 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="LANSync filesystem index")
     parser.add_argument("--version", action="version", version="LANSync 0.1.0")
     commands = parser.add_subparsers(dest="command", required=True)
+    recovery = commands.add_parser('recovery', help='List or export recovery copies')
+    recovery_commands = recovery.add_subparsers(dest='recovery_command', required=True)
+    listing = recovery_commands.add_parser('list')
+    listing.add_argument('--state-dir', type=Path, required=True)
+    listing.add_argument('--json', action='store_true')
+    restore = recovery_commands.add_parser('restore')
+    restore.add_argument('id')
+    restore.add_argument('--state-dir', type=Path, required=True)
+    restore.add_argument('--output', type=Path, required=True)
     status = commands.add_parser('status', help='Inspect saved synchronization reports')
     status.add_argument('--state-dir', type=Path, required=True)
     status.add_argument('--json', action='store_true', help='Print machine-readable JSON')
@@ -84,6 +93,25 @@ def main(argv=None):
             command.add_argument("--interval", type=float, default=60, help="Periodic scan interval (default: 60)")
             command.add_argument("--max-delay", type=float, default=5, help="Maximum event batching time (default: 5)")
     args = parser.parse_args(argv)
+    if args.command == 'recovery':
+        from .recovery import list_copies, restore_copy
+        import json
+        try:
+            if args.recovery_command == 'restore':
+                print(f'Restored: {restore_copy(args.state_dir, args.id, args.output)}')
+            else:
+                copies = list_copies(args.state_dir)
+                if args.json:
+                    print(json.dumps(copies, ensure_ascii=True, indent=2))
+                else:
+                    for copy in copies:
+                        print(copy)
+                    if not copies:
+                        print('No recovery copies.')
+            return 0
+        except (OSError, ValueError) as exc:
+            print(f'Error: {exc}', file=sys.stderr)
+            return 1
     if args.command == 'status':
         from .status import show_status
         try:
