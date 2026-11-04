@@ -93,7 +93,50 @@ def main(argv=None):
             command.add_argument("--debounce", type=float, default=0.5, help="Quiet period in seconds (default: 0.5)")
             command.add_argument("--interval", type=float, default=60, help="Periodic scan interval (default: 60)")
             command.add_argument("--max-delay", type=float, default=5, help="Maximum event batching time (default: 5)")
-    args = parser.parse_args(argv)
+    for name in ('scan', 'watch', 'serve', 'pull', 'sync', 'resolve'):
+        commands.choices[name].add_argument('--log-file', type=Path, help='New log file outside synchronized and state folders')
+    raw_args = list(sys.argv[1:] if argv is None else argv)
+    args = parser.parse_args(raw_args)
+    if args.command == 'run':
+        from .config import load_arguments
+        try:
+            return main(load_arguments(args.config, commands))
+        except (OSError, ValueError) as exc:
+            print(f'Error: {exc}', file=sys.stderr)
+            return 1
+    if getattr(args, 'log_file', None):
+        from .logging_output import transcript
+        try:
+            path = args.log_file.expanduser().absolute()
+            root = args.root.expanduser().resolve()
+            outside_root(path.resolve(), root)
+            state = (getattr(args, 'state_dir', None) or default_state(root)).expanduser().resolve()
+            outside_root(path.resolve(), state)
+            for suffix in ('', '.1', '.2', '.3'):
+                candidate = Path(str(path) + suffix)
+                if candidate.exists() or candidate.is_symlink():
+                    raise ValueError('Log and rotation filenames must be new')
+            secrets = []
+            if getattr(args, 'token_file', None):
+                from .network import read_token
+                secrets.append(read_token(args.token_file))
+            cleaned = []
+            iterator = iter(raw_args)
+            for item in iterator:
+                if item == '--':
+                    cleaned.extend([item, *iterator])
+                    break
+                if item == '--log-file':
+                    next(iterator)
+                elif not item.startswith('--log-file='):
+                    cleaned.append(item)
+            with transcript(path, secrets):
+                code = main(cleaned)
+                print(f'LANSync exit code: {code}')
+                return code
+        except (OSError, ValueError) as exc:
+            print(f'Error: {exc}', file=sys.stderr)
+            return 1
     if args.command == 'recovery':
         from .recovery import list_copies, restore_copy
         import json
