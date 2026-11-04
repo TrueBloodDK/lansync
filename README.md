@@ -325,3 +325,35 @@ sync. Команда не подключается к серверу, не со�
 журнал. Существование каталогов, содержимое сертификатов и токенов, доступность
 сети и возможность записи проверяются при настоящем запуске. Код 0 означает
 успешную проверку конфигурации; неверная конфигурация возвращает ненулевой код.
+
+## Работа с одной конфигурацией
+
+Для client.toml с command="sync" доступны:
+
+```sh
+lansync run client.toml --check
+lansync run client.toml
+lansync run client.toml --action once
+lansync run client.toml --action plan --json
+lansync run client.toml --action doctor --json
+lansync run client.toml --action status
+lansync run client.toml --action resolve --path notes.txt --choose remote
+lansync run client.toml --action recovery-list --json
+lansync run client.toml --action recovery-verify
+```
+
+start (по умолчанию) запускает исходную конфигурацию. once выполняет реальный
+однократный sync; plan выполняет dry-run. Эти действия игнорируют настроенные
+watch/dry_run/json, выбирая режим по действию и явному --json. Дополнительные
+действия не используют log_file исходного запуска. resolve требует остановить
+фоновый sync. Для status/recovery нужен явно заданный state_dir; их также можно
+использовать с конфигурацией сервера. Для doctor/once/plan/resolve нужна sync-конфигурация.
+--json доступен для plan/status/doctor/recovery-list/recovery-verify.
+--check проверяет выбранное действие без запуска. Относительные пути по-прежнему
+считаются от TOML. Некорректная исходная конфигурация отклоняется до выбора действия.
+
+Архитектура: options.py содержит общие проверки параметров, workflow.py — выбор
+операции без сетевых вызовов и печати. Модули sync/status/recovery/diagnostics
+возвращают данные для CLI и будущего GUI. Полное отделение парсера argparse
+от модели конфигурации остаётся отдельной задачей; существующие команды CLI
+продолжают поддерживаться.

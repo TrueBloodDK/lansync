@@ -92,3 +92,27 @@ class ConfigTests(unittest.TestCase):
             config.write_text(config.read_text()+'watch=true\n')
             with contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(main(['run',str(config),'--check']),1)
+
+    def test_project_actions_reuse_config(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as tmp:
+            base=Path(tmp); config=base/'client.toml'
+            config.write_text('command="sync"\nurl="https://localhost:8765"\nroot="shared"\nstate_dir="state"\ntoken_file="token"\nwatch=true\n')
+            for action in ('once','plan','resolve'):
+                extra=['--path','hello.txt','--choose','remote'] if action=='resolve' else []
+                with patch('lansync.cli.network_command',return_value=0) as handler:
+                    self.assertEqual(main(['run',str(config),'--action',action,*extra]),0)
+                args=handler.call_args.args[0]
+                self.assertEqual(args.root,base/'shared')
+                self.assertEqual(args.state_dir,base/'state')
+                if action!='resolve':
+                    self.assertFalse(args.watch)
+                    self.assertEqual(args.dry_run,action=='plan')
+                else:
+                    self.assertEqual(args.path,'hello.txt')
+            with patch('lansync.status.show_status',return_value=0) as handler:
+                self.assertEqual(main(['run',str(config),'--action','status','--json']),0)
+                self.assertEqual(handler.call_args.args[0],base/'state')
+                self.assertTrue(handler.call_args.kwargs['as_json'])
+            with contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main(['run',str(config),'--action','resolve']),1)

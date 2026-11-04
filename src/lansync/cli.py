@@ -54,6 +54,10 @@ def main(argv=None):
     run = commands.add_parser('run', help='Run a command from a TOML configuration')
     run.add_argument('config', type=Path)
     run.add_argument('--check', action='store_true', help='Validate configuration syntax and argument combinations without running')
+    run.add_argument('--action', choices=['start', 'once', 'plan', 'status', 'doctor', 'resolve', 'recovery-list', 'recovery-verify'], default='start')
+    run.add_argument('--path', help='Relative conflict path for resolve')
+    run.add_argument('--choose', choices=['local', 'remote'])
+    run.add_argument('--json', action='store_true', help='Structured output for plan, status, doctor or recovery')
     serve = commands.add_parser('serve', help='Serve a read-only manifest and files')
     serve.add_argument('root', type=Path)
     serve.add_argument('--state-dir', type=Path)
@@ -129,27 +133,15 @@ def main(argv=None):
         from .config import load_arguments
         try:
             arguments = load_arguments(args.config, commands)
+            configured = parser.parse_args(arguments)
+            from .options import validate_options
+            validate_options(configured)
+            from .workflow import action_arguments
+            arguments = action_arguments(configured, args, arguments)
             if args.check:
                 configured = parser.parse_args(arguments)
-                if configured.command == 'sync':
-                    if configured.dry_run and configured.watch:
-                        raise ValueError('--dry-run cannot be combined with --watch')
-                    if configured.json and not configured.dry_run:
-                        raise ValueError('--json requires --dry-run')
-                    import math
-                    if any(not math.isfinite(v) or v <= 0 for v in (configured.interval, configured.retry_max)) or configured.retry_max < configured.interval:
-                        raise ValueError('Invalid synchronization intervals')
-                if configured.command == 'serve':
-                    if not 1 <= configured.port <= 65535:
-                        raise ValueError('Port must be between 1 and 65535')
-                    if bool(configured.cert_file) != bool(configured.key_file):
-                        raise ValueError('Both cert_file and key_file are required')
-                if configured.command in {'scan', 'watch', 'serve'}:
-                    validate_patterns(configured.exclude)
-                if configured.command == 'watch':
-                    import math
-                    if any(not math.isfinite(v) or v <= 0 for v in (configured.interval, configured.debounce, configured.max_delay)):
-                        raise ValueError('Watch intervals must be positive finite numbers')
+                from .options import validate_options
+                validate_options(configured)
                 print(f'Configuration syntax OK: {configured.command}; paths, credentials and connectivity were not checked.')
                 return 0
             return main(arguments)
@@ -224,14 +216,13 @@ def main(argv=None):
         except (OSError, ValueError) as exc:
             print(f'Error: {exc}', file=sys.stderr)
             return 1
-    if args.command == 'run':
-        from .config import load_arguments
+    if args.command in {'serve', 'pull', 'sync', 'resolve'}:
+        from .options import validate_options
         try:
-            args = parser.parse_args(load_arguments(args.config, commands))
-        except (OSError, ValueError) as exc:
+            validate_options(args)
+        except ValueError as exc:
             print(f'Error: {exc}', file=sys.stderr)
             return 1
-    if args.command in {'serve', 'pull', 'sync', 'resolve'}:
         return network_command(args)
     try:
         patterns = validate_patterns(args.exclude)
