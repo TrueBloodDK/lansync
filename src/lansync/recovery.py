@@ -81,3 +81,45 @@ def restore_copy(state, identifier, destination):
         if temporary is not None:
             temporary.unlink(missing_ok=True)
     return destination
+
+
+def verify_copies(state):
+    """Read every recovery copy, reporting problems without modifying storage."""
+    directory = recovery_directory(state)
+    entries = []
+    if directory.exists():
+        identifiers = sorted({p.stem for p in directory.iterdir() if p.suffix in {'.json', '.bak'}})
+        for identifier in identifiers:
+            item = {'id': identifier}
+            metadata = directory / (identifier + '.json')
+            backup = directory / (identifier + '.bak')
+            try:
+                if metadata.is_symlink() or backup.is_symlink():
+                    raise ValueError('Recovery symlinks are not supported')
+                if not metadata.exists():
+                    item['status'] = 'orphan'
+                    item['error'] = 'Backup has no metadata'
+                else:
+                    backup, data = read_copy(directory, identifier)
+                    item['path'] = data['path']
+                    if not backup.exists():
+                        item['status'] = 'missing'
+                        item['error'] = 'Metadata has no backup'
+                    elif not backup.is_file():
+                        raise ValueError('Backup is not a regular file')
+                    else:
+                        info, digest = hash_file(backup)
+                        item['size'] = info.st_size
+                        item['sha256'] = digest
+                        if info.st_size != data['previous']['size'] or digest != data['previous']['sha256']:
+                            item['status'] = 'corrupt'
+                            item['error'] = 'Backup hash or size mismatch'
+                        else:
+                            item['status'] = 'verified'
+            except (OSError, ValueError) as exc:
+                item['status'] = 'error'
+                item['error'] = str(exc)
+            entries.append(item)
+    verified = sum(e['status'] == 'verified' for e in entries)
+    return {'entries': entries, 'total': len(entries), 'verified': verified,
+            'problems': len(entries) - verified}

@@ -35,6 +35,9 @@ def main(argv=None):
     listing = recovery_commands.add_parser('list')
     listing.add_argument('--state-dir', type=Path, required=True)
     listing.add_argument('--json', action='store_true')
+    verify = recovery_commands.add_parser('verify', help='Verify hashes and detect incomplete recovery pairs')
+    verify.add_argument('--state-dir', type=Path, required=True)
+    verify.add_argument('--json', action='store_true')
     restore = recovery_commands.add_parser('restore')
     restore.add_argument('id')
     restore.add_argument('--state-dir', type=Path, required=True)
@@ -165,9 +168,18 @@ def main(argv=None):
             print(f'Error: {exc}', file=sys.stderr)
             return 1
     if args.command == 'recovery':
-        from .recovery import list_copies, restore_copy
+        from .recovery import list_copies, restore_copy, verify_copies
         import json
         try:
+            if args.recovery_command == 'verify':
+                report = verify_copies(args.state_dir)
+                if args.json:
+                    print(json.dumps(report, ensure_ascii=True, indent=2))
+                else:
+                    for entry in report['entries']:
+                        print(f"{entry['id']}: {entry['status']} — {entry.get('path', '')} {entry.get('error', '')}")
+                    print(f"Verified: {report['verified']}; problems: {report['problems']}; total: {report['total']}")
+                return 2 if report['problems'] else 0
             if args.recovery_command == 'restore':
                 print(f'Restored: {restore_copy(args.state_dir, args.id, args.output)}')
             else:
