@@ -4,6 +4,10 @@ from .policy import validate_patterns
 
 def validate_options(configured):
     if configured.command == 'sync':
+        if not math.isfinite(configured.event_debounce) or configured.event_debounce <= 0:
+            raise ValueError('event_debounce must be positive and finite')
+        if configured.local_events and not configured.watch:
+            raise ValueError('--local-events requires --watch')
         if configured.dry_run and configured.watch:
             raise ValueError('--dry-run cannot be combined with --watch')
         if configured.json and not configured.dry_run:

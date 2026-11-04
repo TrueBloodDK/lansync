@@ -84,3 +84,38 @@ class SyncLoopTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 continuous_sync(None, self.root, self.state, interval=interval)
         self.assertFalse(self.state.exists())
+
+    def test_native_change_triggers_early_pass(self):
+        from threading import Event, Thread
+        stop=Event(); first=Event(); finished=Event(); errors=[]; calls=[]
+        def operation(*args):
+            calls.append(1)
+            if len(calls)==1: first.set()
+            else: stop.set()
+            return report()
+        def worker():
+            try:
+                continuous_sync(None,self.root,self.state,interval=30,retry_max=30,stop=stop,local_events=True,event_debounce=.05)
+            except BaseException as exc: errors.append(exc)
+            finally: finished.set()
+        with patch('lansync.sync_loop._synchronize',side_effect=operation):
+            thread=Thread(target=worker); thread.start()
+            try:
+                self.assertTrue(first.wait(5))
+                (self.root/'new.txt').write_text('change')
+                self.assertTrue(finished.wait(5),'Local event did not trigger an early pass')
+            finally:
+                stop.set(); thread.join(5)
+        self.assertFalse(errors)
+        self.assertGreaterEqual(len(calls),2)
+        self.assertFalse((self.state/'sync.lock').exists())
+
+    def test_read_events_do_not_trigger_sync(self):
+        from lansync.change_signal import ChangeSignal
+        from watchdog.events import FileOpenedEvent, FileClosedNoWriteEvent, FileModifiedEvent
+        signal=ChangeSignal()
+        signal.on_any_event(FileOpenedEvent('file'))
+        signal.on_any_event(FileClosedNoWriteEvent('file'))
+        self.assertFalse(signal.changed.is_set())
+        signal.on_any_event(FileModifiedEvent('file'))
+        self.assertTrue(signal.changed.is_set())

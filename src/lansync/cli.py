@@ -271,7 +271,8 @@ def network_command(args):
                         if event.get('report'):
                             print(event['report'], flush=True)
                     continuous_sync(client, root, args.state_dir, interval=args.interval,
-                                    retry_max=args.retry_max, on_event=show)
+                                    retry_max=args.retry_max, on_event=show,
+                                    local_events=args.local_events, event_debounce=args.event_debounce)
                     return 0
                 result = synchronize(client, root, args.state_dir, dry_run=args.dry_run)
             if args.dry_run:

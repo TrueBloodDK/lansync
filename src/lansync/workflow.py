@@ -51,7 +51,7 @@ def prepare_action(config, request):
         return SimpleNamespace(**values)
     values['log_file']=None
     if action in {'once','plan'}:
-        values.update(command='sync',watch=False,dry_run=action=='plan',json=request.json)
+        values.update(command='sync',watch=False,local_events=False,dry_run=action=='plan',json=request.json)
     elif action=='doctor':
         values.update(command='doctor',json=request.json)
     elif action=='status':

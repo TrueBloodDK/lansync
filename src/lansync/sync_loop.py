@@ -7,6 +7,7 @@ import httpx
 
 from .manifest import export_manifest
 from .sync import _synchronize, locked_sync_state
+from .change_signal import observe_changes
 
 
 def retryable(error):
@@ -19,14 +20,14 @@ def retryable(error):
 
 
 def continuous_sync(client, root, state, *, interval=30.0, retry_max=300.0,
-                    stop=None, on_event=None):
-    for value in (interval, retry_max):
+                    stop=None, on_event=None, local_events=False, event_debounce=.5):
+    for value in (interval, retry_max, event_debounce):
         if not math.isfinite(value) or value <= 0:
             raise ValueError('Sync intervals must be positive finite numbers')
     if retry_max < interval:
         raise ValueError('Maximum retry delay must not be smaller than the interval')
     stop = stop if stop is not None else Event()
-    with locked_sync_state(root, state) as (root, state):
+    with locked_sync_state(root, state) as (root, state), observe_changes(root, local_events) as changes:
         status = {'status': 'starting', 'failures': 0, 'last_success_utc': None}
         previous_event = None
         delay = interval
@@ -47,6 +48,8 @@ def continuous_sync(client, root, state, *, interval=30.0, retry_max=300.0,
         publish({'status': 'starting'})
         try:
             while not stop.is_set():
+                if changes:
+                    changes.changed.clear()
                 try:
                     report = _synchronize(client, root, state)
                 except httpx.HTTPError as exc:
@@ -62,7 +65,10 @@ def continuous_sync(client, root, state, *, interval=30.0, retry_max=300.0,
                     status['last_success_utc'] = datetime.now(timezone.utc).isoformat()
                     publish({'status': 'conflicts' if report['conflicts'] else 'synced',
                              'report': report, 'error': None, 'retry_in_seconds': None})
-                stop.wait(delay)
+                if changes and status['failures'] == 0:
+                    changes.wait(stop, delay, event_debounce)
+                else:
+                    stop.wait(delay)
         except KeyboardInterrupt:
             publish({'status': 'stopped', 'retry_in_seconds': None})
         except Exception as exc:
