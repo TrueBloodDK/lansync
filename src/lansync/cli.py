@@ -70,6 +70,7 @@ def main(argv=None):
     sync.add_argument('--allow-http', action='store_true')
     sync.add_argument('--watch', action='store_true', help='Repeat synchronization until Ctrl+C')
     sync.add_argument('--dry-run', action='store_true', help='Preview changes without transferring files or saving client state')
+    sync.add_argument('--json', action='store_true', help='Print the dry-run plan as JSON (requires --dry-run)')
     sync.add_argument('--interval', type=float, default=30, help='Seconds between completed passes (default: 30)')
     sync.add_argument('--retry-max', type=float, default=300, help='Maximum retry delay (default: 300)')
     resolve = commands.add_parser('resolve', help='Resolve one recorded file conflict')
@@ -94,6 +95,7 @@ def main(argv=None):
             command.add_argument("--interval", type=float, default=60, help="Periodic scan interval (default: 60)")
             command.add_argument("--max-delay", type=float, default=5, help="Maximum event batching time (default: 5)")
     for name in ('scan', 'watch', 'serve', 'pull', 'sync', 'resolve'):
+        commands.choices[name].allow_abbrev = False
         commands.choices[name].add_argument('--log-file', type=Path, help='New log file outside synchronized and state folders')
     raw_args = list(sys.argv[1:] if argv is None else argv)
     args = parser.parse_args(raw_args)
@@ -132,7 +134,7 @@ def main(argv=None):
                     cleaned.append(item)
             with transcript(path, secrets):
                 code = main(cleaned)
-                print(f'LANSync exit code: {code}')
+                print(f'LANSync exit code: {code}', file=sys.stderr)
                 return code
         except (OSError, ValueError) as exc:
             print(f'Error: {exc}', file=sys.stderr)
@@ -232,6 +234,8 @@ def network_command(args):
             from .sync import synchronize
             if args.dry_run and args.watch:
                 raise ValueError('--dry-run cannot be combined with --watch')
+            if args.json and not args.dry_run:
+                raise ValueError('--json requires --dry-run')
             with make_client(args.url, token, args.ca_file, args.allow_http) as client:
                 if args.watch:
                     from .sync_loop import continuous_sync
@@ -246,6 +250,10 @@ def network_command(args):
                     return 0
                 result = synchronize(client, root, args.state_dir, dry_run=args.dry_run)
             if args.dry_run:
+                if args.json:
+                    import json
+                    print(json.dumps(result, ensure_ascii=True, indent=2))
+                    return 2 if result['conflicts'] else 0
                 print('Preview only; files may change before the actual sync.')
                 for action in result['planned']:
                     print(f"{action['operation']}: {action['path']}")
