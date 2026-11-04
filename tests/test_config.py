@@ -78,3 +78,17 @@ class ConfigTests(unittest.TestCase):
                 config.write_text(body)
                 with contextlib.redirect_stderr(io.StringIO()):
                     self.assertEqual(main(['run', str(config)]), 1)
+
+    def test_check_does_not_run_or_create_state(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as tmp:
+            base=Path(tmp)
+            config=base/'client.toml'
+            config.write_text('command="sync"\nurl="https://localhost"\nroot="missing-root"\nstate_dir="state"\ntoken_file="missing-token"\ndry_run=true\njson=true\n')
+            with patch('lansync.cli.network_command') as network, contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(main(['run',str(config),'--check']),0)
+                network.assert_not_called()
+            self.assertEqual(list(base.iterdir()),[config])
+            config.write_text(config.read_text()+'watch=true\n')
+            with contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main(['run',str(config),'--check']),1)

@@ -44,6 +44,7 @@ def main(argv=None):
     status.add_argument('--json', action='store_true', help='Print machine-readable JSON')
     run = commands.add_parser('run', help='Run a command from a TOML configuration')
     run.add_argument('config', type=Path)
+    run.add_argument('--check', action='store_true', help='Validate configuration syntax and argument combinations without running')
     serve = commands.add_parser('serve', help='Serve a read-only manifest and files')
     serve.add_argument('root', type=Path)
     serve.add_argument('--state-dir', type=Path)
@@ -102,7 +103,31 @@ def main(argv=None):
     if args.command == 'run':
         from .config import load_arguments
         try:
-            return main(load_arguments(args.config, commands))
+            arguments = load_arguments(args.config, commands)
+            if args.check:
+                configured = parser.parse_args(arguments)
+                if configured.command == 'sync':
+                    if configured.dry_run and configured.watch:
+                        raise ValueError('--dry-run cannot be combined with --watch')
+                    if configured.json and not configured.dry_run:
+                        raise ValueError('--json requires --dry-run')
+                    import math
+                    if any(not math.isfinite(v) or v <= 0 for v in (configured.interval, configured.retry_max)) or configured.retry_max < configured.interval:
+                        raise ValueError('Invalid synchronization intervals')
+                if configured.command == 'serve':
+                    if not 1 <= configured.port <= 65535:
+                        raise ValueError('Port must be between 1 and 65535')
+                    if bool(configured.cert_file) != bool(configured.key_file):
+                        raise ValueError('Both cert_file and key_file are required')
+                if configured.command in {'scan', 'watch', 'serve'}:
+                    validate_patterns(configured.exclude)
+                if configured.command == 'watch':
+                    import math
+                    if any(not math.isfinite(v) or v <= 0 for v in (configured.interval, configured.debounce, configured.max_delay)):
+                        raise ValueError('Watch intervals must be positive finite numbers')
+                print(f'Configuration syntax OK: {configured.command}; paths, credentials and connectivity were not checked.')
+                return 0
+            return main(arguments)
         except (OSError, ValueError) as exc:
             print(f'Error: {exc}', file=sys.stderr)
             return 1
