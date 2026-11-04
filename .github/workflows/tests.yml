@@ -20,3 +20,5 @@ jobs:
       - run: python -m unittest discover -s tests -v
       - run: python -m lansync --help
       - run: python scripts/benchmark.py --counts 10 --repeats 1 --work-dir .benchmark-work --output benchmark-smoke.json
+      - run: python -m pip install build
+      - run: python scripts/release_check.py --output .release-check

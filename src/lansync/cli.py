@@ -30,6 +30,10 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="LANSync filesystem index")
     parser.add_argument("--version", action="version", version="LANSync 0.1.0")
     commands = parser.add_subparsers(dest="command", required=True)
+    init = commands.add_parser('init', help='Create a new client or server project directory')
+    init.add_argument('directory', type=Path)
+    init.add_argument('--mode', choices=['client', 'server'], required=True)
+    init.add_argument('--url', help='HTTPS server URL for a client project')
     doctor = commands.add_parser('doctor', help='Diagnose server access without transferring files')
     doctor.add_argument('url')
     doctor.add_argument('--token-file', type=Path, required=True)
@@ -97,6 +101,16 @@ def main(argv=None):
 
 
 def execute(args):
+    if args.command == 'init':
+        from .project_init import initialize
+        try:
+            config = initialize(args.directory, args.mode, args.url)
+            print(f'Created: {config}')
+            print('Place credentials in the credentials directory before starting. See INSTALL.md.')
+            return 0
+        except (OSError, ValueError) as exc:
+            print(f'Error: {exc}', file=sys.stderr)
+            return 1
     if args.command == 'doctor':
         import json
         from .diagnostics import diagnose
