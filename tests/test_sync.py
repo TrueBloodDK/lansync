@@ -286,3 +286,34 @@ class SyncTests(unittest.TestCase):
             resolve_conflict(self.client, self.local, self.state, 'file', 'local')
         self.assertEqual((self.server / 'file').read_bytes(), b'newer remote')
         self.assertEqual((self.local / 'file').read_bytes(), b'local')
+
+    def test_resolution_local_edit_and_lock(self):
+        from lansync.sync import resolve_conflict, locked_sync_state
+        self.seed()
+        (self.local / 'file').write_bytes(b'local')
+        (self.server / 'file').write_bytes(b'remote')
+        self.sync()
+        with locked_sync_state(self.local, self.state):
+            with self.assertRaises(FileExistsError):
+                resolve_conflict(self.client, self.local, self.state, 'file', 'remote')
+        (self.local / 'file').write_bytes(b'new local')
+        with self.assertRaisesRegex(ValueError, 'changed since detection'):
+            resolve_conflict(self.client, self.local, self.state, 'file', 'remote')
+        self.assertEqual((self.local / 'file').read_bytes(), b'new local')
+
+    def test_resolution_delete_and_remaining_conflict(self):
+        from lansync.sync import resolve_conflict
+        self.seed()
+        (self.server / 'other').write_bytes(b'base')
+        self.sync()
+        (self.local / 'file').unlink()
+        (self.server / 'file').write_bytes(b'edited')
+        (self.local / 'other').write_bytes(b'left')
+        (self.server / 'other').write_bytes(b'right')
+        self.sync()
+        previous = json.loads((self.state / 'last-sync.json').read_text())
+        result = resolve_conflict(self.client, self.local, self.state, 'file', 'local')
+        self.assertEqual(result['conflicts'], ['other'])
+        self.assertEqual(result['conflict_versions']['other'], previous['conflict_versions']['other'])
+        self.assertFalse((self.server / 'file').exists())
+        self.assertIn(b'edited', [p.read_bytes() for p in (self.database.parent / 'recovery').glob('*.bak')])
