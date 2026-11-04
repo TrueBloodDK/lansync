@@ -62,6 +62,8 @@ def publish_new(source, target):
 
 def apply_change(root, key, desired, temporary, expected, recovery):
     from .network import safe_path
+    if list(recovery.glob('*.pending.json')):
+        raise ValueError('Unfinished file replacement; inspect recovery pending records before retrying')
     target = safe_path(root, key)
     current = disk_entry(target)
     if fingerprint(current) != fingerprint(expected):
@@ -85,16 +87,23 @@ def apply_change(root, key, desired, temporary, expected, recovery):
         # Recovery must be on the same volume as the root for atomic rename.
         backup = recovery / (uuid.uuid4().hex + '.bak')
         export_manifest({'path': key, 'previous': current}, backup.with_suffix('.json'))
-        os.rename(target, backup)
+        pending = backup.with_suffix('.pending.json')
+        export_manifest({'path': key, 'backup': backup.name, 'previous': current}, pending)
         try:
+            os.rename(target, backup)
             if fingerprint(disk_entry(backup)) != fingerprint(expected):
                 raise ValueError('File changed during replacement; preserved in recovery')
             if desired:
                 publish_new(temporary, safe_path(root, key))
         except BaseException:
-            if not target.exists():
+            if backup.exists() and not target.exists():
                 publish_new(backup, target)
+            if not backup.exists():
+                pending.unlink(missing_ok=True)
+                backup.with_suffix('.json').unlink(missing_ok=True)
             raise
+        else:
+            pending.unlink(missing_ok=True)
     elif desired:
         publish_new(temporary, safe_path(root, key))
 
@@ -165,6 +174,8 @@ def resolve_conflict(client, root, state, key, choice):
 
 def _synchronize(client, root, state, resolution=None, dry_run=False):
     started = monotonic()
+    if list((state / 'recovery').glob('*.pending.json')):
+        raise ValueError('Unfinished file replacement; inspect recovery pending records before syncing')
     from .network import BLOCK, safe_path
     from .policy import excluded, portability_errors
     remote_manifest = fetch_manifest(client)

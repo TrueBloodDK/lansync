@@ -88,6 +88,9 @@ def create_app(root, database, token, exclude_patterns=(), allow_write=False):
 
     def refresh(paths=None):
         nonlocal initialized
+        if list((database.parent / 'recovery').glob('*.pending.json')):
+            published.clear()
+            raise HTTPException(409, 'Unfinished file replacement; inspect server recovery pending records')
         store = Store(database, root)
         try:
             result = store.update(scan_tree(root, patterns) if paths is None or not initialized

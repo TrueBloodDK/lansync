@@ -360,3 +360,66 @@ class SyncTests(unittest.TestCase):
         self.assertGreaterEqual(report['duration_seconds'],0)
         self.assertEqual(report['operation'],'sync')
         self.assertEqual(json.loads((self.state/'last-sync.json').read_text())['completed_utc'],report['completed_utc'])
+
+    def test_interrupted_download_keeps_old_file_and_baseline(self):
+        from unittest.mock import patch
+        from contextlib import contextmanager
+        import httpx
+        self.seed()
+        before=(self.state/'baseline.json').read_bytes()
+        (self.server/'file').write_bytes(b'new contents')
+        original=self.client.stream
+        class Broken:
+            def raise_for_status(self): pass
+            def iter_bytes(self, size):
+                yield b'new'
+                raise httpx.ReadError('simulated disconnect')
+        @contextmanager
+        def stream(method,url,**kwargs):
+            if url=='/v1/file': yield Broken()
+            else:
+                with original(method,url,**kwargs) as response: yield response
+        with patch.object(self.client,'stream',stream):
+            with self.assertRaises(httpx.ReadError): self.sync()
+        self.assertEqual((self.local/'file').read_bytes(),b'base')
+        self.assertEqual((self.state/'baseline.json').read_bytes(),before)
+        self.assertFalse(list(self.local.glob('.lansync-*.tmp')))
+        self.assertFalse((self.state/'sync.lock').exists())
+        self.assertFalse(self.sync()['conflicts'])
+        self.assertEqual((self.local/'file').read_bytes(),b'new contents')
+
+    def test_replace_failure_rolls_back_and_cleans_pending(self):
+        from unittest.mock import patch
+        import errno
+        from lansync import sync as module
+        self.seed(); (self.server/'file').write_bytes(b'new')
+        original=module.publish_new
+        calls=[]
+        def fail_first(source,target):
+            calls.append(1)
+            if len(calls)==1: raise OSError(errno.ENOSPC,'simulated disk full')
+            return original(source,target)
+        with patch.object(module,'publish_new',fail_first):
+            with self.assertRaises(OSError): self.sync()
+        self.assertEqual((self.local/'file').read_bytes(),b'base')
+        self.assertFalse(list((self.state/'recovery').glob('*.pending.json')))
+        self.assertFalse(self.sync()['conflicts'])
+
+    def test_failed_rollback_blocks_next_sync(self):
+        from unittest.mock import patch
+        from lansync import sync as module
+        self.seed(); (self.server/'file').write_bytes(b'new')
+        with patch.object(module,'publish_new',side_effect=OSError('simulated replacement and rollback failure')):
+            with self.assertRaises(OSError): self.sync()
+        self.assertTrue(list((self.state/'recovery').glob('*.pending.json')))
+        self.assertIn(b'base',[p.read_bytes() for p in (self.state/'recovery').glob('*.bak')])
+        with self.assertRaisesRegex(ValueError,'Unfinished file replacement'): self.sync()
+        self.assertEqual((self.server/'file').read_bytes(),b'new')
+
+    def test_server_pending_blocks_manifest_before_deletion_index(self):
+        self.seed()
+        recovery=self.database.parent/'recovery'; recovery.mkdir(exist_ok=True)
+        (recovery/'interrupted.pending.json').write_text('{}')
+        response=self.client.get('/v1/manifest')
+        self.assertEqual(response.status_code,409)
+        self.assertEqual((self.local/'file').read_bytes(),b'base')
