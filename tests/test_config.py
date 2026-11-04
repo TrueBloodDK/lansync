@@ -116,3 +116,22 @@ class ConfigTests(unittest.TestCase):
                 self.assertTrue(handler.call_args.kwargs['as_json'])
             with contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(main(['run',str(config),'--action','resolve']),1)
+
+    def test_model_without_parser_and_all_project_actions(self):
+        from lansync.config import load_project
+        from lansync.workflow import action_arguments
+        from types import SimpleNamespace
+        with tempfile.TemporaryDirectory() as tmp:
+            base=Path(tmp); config=base/'client.toml'
+            config.write_text('command="sync"\nurl="https://localhost"\nroot="shared"\nstate_dir="state"\ntoken_file="token"\nwatch=true\n')
+            project=load_project(config)
+            self.assertEqual(project.values['root'],base/'shared')
+            self.assertEqual(project.values['interval'],30)
+            for action in ('start','once','plan','doctor','status','resolve','recovery-list','recovery-verify','recovery-restore'):
+                with self.subTest(action=action):
+                    request=SimpleNamespace(action=action,json=False,path='hello' if action=='resolve' else None,choose='local' if action=='resolve' else None,id='a'*32 if action=='recovery-restore' else None,output=base/'restored' if action=='recovery-restore' else None)
+                    args=action_arguments(project.namespace(),request,project.arguments())
+                    self.assertTrue(args)
+                    if action=='recovery-restore':
+                        self.assertIn('--output='+str(base/'restored'),args)
+            self.assertEqual(list(base.iterdir()),[config])

@@ -3,6 +3,8 @@
 
 def action_arguments(config, request, original):
     action = request.action
+    if action != 'recovery-restore' and (getattr(request, 'id', None) or getattr(request, 'output', None)):
+        raise ValueError('--id and --output require recovery-restore')
     if action != 'resolve' and (request.path is not None or request.choose is not None):
         raise ValueError('--path and --choose require --action resolve')
     if request.json and action not in {'plan', 'status', 'doctor', 'recovery-list', 'recovery-verify'}:
@@ -20,9 +22,13 @@ def action_arguments(config, request, original):
             elif value is not None and value is not False:
                 result.append('--'+name.replace('_','-')+'='+str(value))
         return result
-    if action in {'status','recovery-list','recovery-verify'}:
+    if action in {'status','recovery-list','recovery-verify','recovery-restore'}:
         if not getattr(config,'state_dir',None):
             raise ValueError('Set state_dir explicitly for this action')
+        if action == 'recovery-restore':
+            if not request.id or request.output is None:
+                raise ValueError('recovery-restore requires --id and --output')
+            return ['recovery','restore',*options('state_dir'),'--output='+str(request.output),'--',request.id]
         result=['status'] if action == 'status' else ['recovery',action.split('-')[1]]
         return result+options('state_dir')+(['--json'] if request.json else [])
     credentials=options('token_file','ca_file','allow_http')

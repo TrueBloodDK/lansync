@@ -54,7 +54,9 @@ def main(argv=None):
     run = commands.add_parser('run', help='Run a command from a TOML configuration')
     run.add_argument('config', type=Path)
     run.add_argument('--check', action='store_true', help='Validate configuration syntax and argument combinations without running')
-    run.add_argument('--action', choices=['start', 'once', 'plan', 'status', 'doctor', 'resolve', 'recovery-list', 'recovery-verify'], default='start')
+    run.add_argument('--action', choices=['start', 'once', 'plan', 'status', 'doctor', 'resolve', 'recovery-list', 'recovery-verify', 'recovery-restore'], default='start')
+    run.add_argument('--id', help='Recovery copy ID for recovery-restore')
+    run.add_argument('--output', type=Path, help='New destination file for recovery-restore')
     run.add_argument('--path', help='Relative conflict path for resolve')
     run.add_argument('--choose', choices=['local', 'remote'])
     run.add_argument('--json', action='store_true', help='Structured output for plan, status, doctor or recovery')
@@ -130,10 +132,11 @@ def main(argv=None):
             print(f"Duration: {report['duration_seconds']} seconds")
         return 0 if report['ok'] else 1
     if args.command == 'run':
-        from .config import load_arguments
+        from .config import load_project
         try:
-            arguments = load_arguments(args.config, commands)
-            configured = parser.parse_args(arguments)
+            project = load_project(args.config)
+            arguments = project.arguments()
+            configured = project.namespace()
             from .options import validate_options
             validate_options(configured)
             from .workflow import action_arguments
