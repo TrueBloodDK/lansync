@@ -30,6 +30,12 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="LANSync filesystem index")
     parser.add_argument("--version", action="version", version="LANSync 0.1.0")
     commands = parser.add_subparsers(dest="command", required=True)
+    doctor = commands.add_parser('doctor', help='Diagnose server access without transferring files')
+    doctor.add_argument('url')
+    doctor.add_argument('--token-file', type=Path, required=True)
+    doctor.add_argument('--ca-file', type=Path)
+    doctor.add_argument('--allow-http', action='store_true')
+    doctor.add_argument('--json', action='store_true')
     recovery = commands.add_parser('recovery', help='List or export recovery copies')
     recovery_commands = recovery.add_subparsers(dest='recovery_command', required=True)
     listing = recovery_commands.add_parser('list')
@@ -103,6 +109,22 @@ def main(argv=None):
         commands.choices[name].add_argument('--log-file', type=Path, help='New log file outside synchronized and state folders')
     raw_args = list(sys.argv[1:] if argv is None else argv)
     args = parser.parse_args(raw_args)
+    if args.command == 'doctor':
+        import json
+        from .diagnostics import diagnose
+        report = diagnose(args.url, args.token_file, args.ca_file, args.allow_http)
+        if args.json:
+            print(json.dumps(report, ensure_ascii=True, indent=2))
+        else:
+            for check in report['checks']:
+                print(f"{check['check']}: {'OK' if check['ok'] else check['reason']}")
+            if report['server']:
+                for key, value in report['server'].items():
+                    print(f'{key}: {value}')
+                if not report['server']['writable']:
+                    print('Read-only server: pull is available; sync requires --allow-write on the server.')
+            print(f"Duration: {report['duration_seconds']} seconds")
+        return 0 if report['ok'] else 1
     if args.command == 'run':
         from .config import load_arguments
         try:
