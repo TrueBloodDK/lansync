@@ -1,6 +1,7 @@
 """Read-only inspection of persisted client reports."""
 import json
 import math
+from datetime import datetime
 from pathlib import Path
 
 
@@ -38,6 +39,17 @@ def read_status(state):
                 if type(data.get(field)) is not int or data[field] < 0:
                     raise ValueError(f'{name}: invalid {field}')
         result[key] = data
+    result['loop_report_older'] = None
+    loop_time = (result['loop'] or {}).get('updated_utc')
+    pass_time = (result['last_sync'] or {}).get('completed_utc')
+    if loop_time and pass_time:
+        try:
+            loop_date, pass_date = datetime.fromisoformat(loop_time), datetime.fromisoformat(pass_time)
+            if loop_date.tzinfo is None or pass_date.tzinfo is None:
+                raise ValueError('Report timestamps require timezone information')
+            result['loop_report_older'] = loop_date < pass_date
+        except (TypeError, ValueError) as exc:
+            raise ValueError('Invalid report timestamp') from exc
     return result
 
 
@@ -51,6 +63,8 @@ def show_status(state, *, as_json=False):
     print('Lock file: ' + ('present (may be stale)' if result['lock_present'] else 'absent'))
     loop = result['loop']
     if loop:
+        if result['loop_report_older']:
+            print('Note: loop report predates the last completed pass; its status may be outdated.')
         for label, key in (('Saved loop status', 'status'), ('Updated UTC', 'updated_utc'),
                            ('Last successful pass UTC', 'last_success_utc'),
                            ('Consecutive errors', 'failures'), ('Retry delay seconds', 'retry_in_seconds'),
@@ -60,6 +74,9 @@ def show_status(state, *, as_json=False):
     report = result['last_sync']
     if report is not None:
         print('Last completed pass:')
+        for field in ('completed_utc', 'duration_seconds', 'operation'):
+            if field in report:
+                print(f'  {field}: {report[field]}')
         for key in ('uploaded', 'downloaded', 'deleted_local', 'deleted_remote'):
             print(f'  {key}: {report[key]}')
         print(f"Conflicts: {len(report['conflicts'])}")

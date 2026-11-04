@@ -50,3 +50,14 @@ class StatusTests(unittest.TestCase):
                     (Path(tmp) / 'loop-status.json').write_text(json.dumps(report))
                     with contextlib.redirect_stderr(io.StringIO()):
                         self.assertEqual(main(['status', '--state-dir', tmp]), 1)
+
+    def test_older_loop_report_is_marked(self):
+        from lansync.status import read_status
+        with tempfile.TemporaryDirectory() as tmp:
+            state=Path(tmp)
+            report=dict(uploaded=0,downloaded=0,deleted_local=0,deleted_remote=0,conflicts=[],completed_utc='2026-11-04T12:00:00+00:00')
+            (state/'last-sync.json').write_text(json.dumps(report))
+            (state/'loop-status.json').write_text(json.dumps(dict(status='failed',updated_utc='2026-11-04T11:00:00+00:00')))
+            self.assertTrue(read_status(state)['loop_report_older'])
+            (state/'loop-status.json').write_text(json.dumps(dict(status='synced',updated_utc='2026-11-04T13:00:00+00:00')))
+            self.assertFalse(read_status(state)['loop_report_older'])

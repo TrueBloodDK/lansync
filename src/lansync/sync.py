@@ -6,6 +6,8 @@ import os
 from pathlib import Path
 import tempfile
 import uuid
+from datetime import datetime, timezone
+from time import monotonic
 from contextlib import contextmanager
 
 from .manifest import export_manifest
@@ -162,6 +164,7 @@ def resolve_conflict(client, root, state, key, choice):
 
 
 def _synchronize(client, root, state, resolution=None, dry_run=False):
+    started = monotonic()
     from .network import BLOCK, safe_path
     from .policy import excluded, portability_errors
     remote_manifest = fetch_manifest(client)
@@ -314,5 +317,8 @@ def _synchronize(client, root, state, resolution=None, dry_run=False):
         for key in remaining:
             if key in previous.get('conflict_versions', {}):
                 report['conflict_versions'][key] = previous['conflict_versions'][key]
+    report['completed_utc'] = datetime.now(timezone.utc).isoformat()
+    report['duration_seconds'] = round(monotonic() - started, 6)
+    report['operation'] = 'resolve' if resolution else 'sync'
     export_manifest(report, state / 'last-sync.json')
     return report

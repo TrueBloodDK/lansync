@@ -352,3 +352,11 @@ class SyncTests(unittest.TestCase):
         with locked_sync_state(self.local, self.state):
             with self.assertRaisesRegex(ValueError, 'locked'):
                 synchronize(self.client, self.local, self.state, dry_run=True)
+
+    def test_completed_pass_timing_is_persisted(self):
+        from datetime import datetime
+        report=self.sync()
+        self.assertIsNotNone(datetime.fromisoformat(report['completed_utc']).tzinfo)
+        self.assertGreaterEqual(report['duration_seconds'],0)
+        self.assertEqual(report['operation'],'sync')
+        self.assertEqual(json.loads((self.state/'last-sync.json').read_text())['completed_utc'],report['completed_utc'])
