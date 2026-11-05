@@ -30,6 +30,14 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="LANSync filesystem index")
     parser.add_argument("--version", action="version", version="LANSync 0.1.0")
     commands = parser.add_subparsers(dest="command", required=True)
+    credentials = commands.add_parser('credentials', help='Create LAN TLS credentials or export a client bundle')
+    credential_commands = credentials.add_subparsers(dest='credential_command', required=True)
+    create = credential_commands.add_parser('create')
+    create.add_argument('--host', action='append', required=True)
+    create.add_argument('--output-dir', type=Path, required=True)
+    export = credential_commands.add_parser('export-client')
+    export.add_argument('--source-dir', type=Path, required=True)
+    export.add_argument('--output-dir', type=Path, required=True)
     init = commands.add_parser('init', help='Create a new client or server project directory')
     init.add_argument('directory', type=Path)
     init.add_argument('--mode', choices=['client', 'server'], required=True)
@@ -101,6 +109,17 @@ def main(argv=None):
 
 
 def execute(args):
+    if args.command == 'credentials':
+        from .credentials import create_credentials, export_client_credentials
+        try:
+            destination = (create_credentials(args.output_dir, args.host) if args.credential_command == 'create'
+                           else export_client_credentials(args.source_dir, args.output_dir))
+            print(f'Credentials written to: {destination}')
+            print('Transfer only ca.pem and token.txt to clients; keep server-key.pem on the server.')
+            return 0
+        except (OSError, ValueError) as exc:
+            print(f'Error: {exc}', file=sys.stderr)
+            return 1
     if args.command == 'init':
         from .project_init import initialize
         try:
