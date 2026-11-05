@@ -1,0 +1,4 @@
+include README.md INSTALL.md NETWORK.md SYNC.md WORKFLOW.md
+recursive-include scripts *.py
+recursive-include examples *.toml
+recursive-include docs *.md

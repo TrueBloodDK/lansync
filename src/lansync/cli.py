@@ -28,7 +28,8 @@ def outside_root(path, root):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="LANSync filesystem index")
-    parser.add_argument("--version", action="version", version="LANSync 0.1.0")
+    from . import __version__
+    parser.add_argument("--version", action="version", version=f"LANSync {__version__}")
     commands = parser.add_subparsers(dest="command", required=True)
     credentials = commands.add_parser('credentials', help='Create LAN TLS credentials or export a client bundle')
     credential_commands = credentials.add_subparsers(dest='credential_command', required=True)
