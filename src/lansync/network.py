@@ -326,7 +326,10 @@ def pull(client, root):
     return {'downloaded': downloaded, 'unchanged': unchanged}
 
 
-def make_client(url, token, ca_file=None, allow_http=False):
+def make_client(url, token, ca_file=None, allow_http=False, request_timeout=60):
+    import math
+    if not math.isfinite(request_timeout) or request_timeout <= 0:
+        raise ValueError("Request timeout must be positive and finite")
     parsed = urlsplit(url)
     if parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path not in {'', '/'}:
         raise ValueError('Use a server origin URL without credentials, path or query')
@@ -336,4 +339,4 @@ def make_client(url, token, ca_file=None, allow_http=False):
         raise ValueError('HTTPS required; test HTTP is allowed only on literal loopback addresses')
     context = ssl.create_default_context(cafile=str(ca_file) if ca_file else None)
     return httpx.Client(base_url=url, headers={'Authorization': 'Bearer ' + token},
-                        verify=context, timeout=60, follow_redirects=False, trust_env=False)
+                        verify=context, timeout=request_timeout, follow_redirects=False, trust_env=False)

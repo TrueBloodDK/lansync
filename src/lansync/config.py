@@ -8,7 +8,7 @@ from .options import validate_options
 
 # type, default; None means optional unless listed in REQUIRED.
 COMMON = {'root': (Path,None), 'state_dir': (Path,None), 'log_file': (Path,None)}
-AUTH = {'token_file': (Path,None), 'ca_file': (Path,None), 'allow_http': (bool,False)}
+AUTH = {'token_file': (Path,None), 'ca_file': (Path,None), 'allow_http': (bool,False), 'request_timeout': (float,60)}
 SCAN = {**COMMON, 'manifest': (Path,None), 'exclude': (list,())}
 SCHEMAS = {
  'scan': SCAN,

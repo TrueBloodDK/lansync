@@ -31,7 +31,7 @@ def action_arguments(config, request, original):
             return ['recovery','restore',*options('state_dir'),'--output='+str(request.output),'--',request.id]
         result=['status', '--watch'] if action == 'monitor' else ['status'] if action == 'status' else ['recovery',action.split('-')[1]]
         return result+options('state_dir')+(['--json'] if request.json else [])
-    credentials=options('token_file','ca_file','allow_http')
+    credentials=options('token_file','ca_file','allow_http','request_timeout')
     if action == 'doctor':
         return ['doctor',*credentials,*(['--json'] if request.json else []),'--',config.url]
     if action == 'resolve':

@@ -46,3 +46,12 @@ class DiagnosticTests(unittest.TestCase):
             report=diagnose('http://192.168.0.1',token)
             self.assertFalse(report['ok'])
             self.assertEqual(report['checks'][-1]['check'],'transport_configuration')
+
+    def test_request_timeout_is_configurable_and_validated(self):
+        from lansync.network import make_client
+        with make_client('https://localhost','a'*40,request_timeout=2.5) as client:
+            self.assertEqual(client.timeout.connect,2.5)
+            self.assertEqual(client.timeout.read,2.5)
+        for value in (0,-1,float('inf'),float('nan')):
+            with self.assertRaises(ValueError):
+                make_client('https://localhost','a'*40,request_timeout=value)

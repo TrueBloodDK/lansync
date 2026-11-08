@@ -49,7 +49,7 @@ def inspect_project(path):
     if project.command in {'sync','pull'}:
         from .network import make_client
         try:
-            with make_client(args.url,token or 'x'*40,args.ca_file,args.allow_http): pass
+            with make_client(args.url,token or 'x'*40,args.ca_file,args.allow_http,args.request_timeout): pass
             record('client_tls_configuration',True,'URL and CA loaded; server was not contacted')
         except (OSError,ValueError): record('client_tls_configuration',False,'Invalid URL or unreadable/invalid CA')
     elif project.command=='serve':

@@ -16,7 +16,7 @@ def inspect_server(client):
             'exclude_patterns': manifest.get('exclude_patterns', [])}
 
 
-def diagnose(url, token_file, ca_file=None, allow_http=False):
+def diagnose(url, token_file, ca_file=None, allow_http=False, request_timeout=60):
     started = monotonic()
     report = {'ok': False, 'checks': [], 'server': None}
     stage = 'credentials'
@@ -24,7 +24,7 @@ def diagnose(url, token_file, ca_file=None, allow_http=False):
         token = read_token(token_file)
         report['checks'].append({'check': stage, 'ok': True})
         stage = 'transport_configuration'
-        with make_client(url, token, ca_file, allow_http) as client:
+        with make_client(url, token, ca_file, allow_http, request_timeout) as client:
             report['checks'].append({'check': stage, 'ok': True})
             stage = 'authenticated_manifest'
             report['server'] = inspect_server(client)

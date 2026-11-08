@@ -45,6 +45,7 @@ def main(argv=None):
     doctor.add_argument('--token-file', type=Path, required=True)
     doctor.add_argument('--ca-file', type=Path)
     doctor.add_argument('--allow-http', action='store_true')
+    doctor.add_argument('--request-timeout', type=float, default=60)
     doctor.add_argument('--json', action='store_true')
     recovery = commands.add_parser('recovery', help='List or export recovery copies')
     recovery_commands = recovery.add_subparsers(dest='recovery_command', required=True)
@@ -101,6 +102,7 @@ def main(argv=None):
     resolve.add_argument('--token-file', type=Path, required=True)
     resolve.add_argument('--ca-file', type=Path)
     resolve.add_argument('--allow-http', action='store_true')
+    resolve.add_argument('--request-timeout', type=float, default=60)
     resolve.add_argument('--log-file', type=Path)
     resolve.allow_abbrev = False
     raw_args = list(sys.argv[1:] if argv is None else argv)
@@ -148,7 +150,7 @@ def execute(args):
     if args.command == 'doctor':
         import json
         from .diagnostics import diagnose
-        report = diagnose(args.url, args.token_file, args.ca_file, args.allow_http)
+        report = diagnose(args.url, args.token_file, args.ca_file, args.allow_http, args.request_timeout)
         if args.json:
             print(json.dumps(report, ensure_ascii=True, indent=2))
         else:
@@ -301,7 +303,7 @@ def network_command(args):
         token = read_token(args.token_file)
         if args.command == 'resolve':
             from .sync import resolve_conflict
-            with make_client(args.url, token, args.ca_file, args.allow_http) as client:
+            with make_client(args.url, token, args.ca_file, args.allow_http, args.request_timeout) as client:
                 result = resolve_conflict(client, root, args.state_dir, args.path, args.choose)
             print(result)
             return 2 if result['conflicts'] else 0
@@ -314,7 +316,7 @@ def network_command(args):
                 raise ValueError('--dry-run cannot be combined with --watch')
             if args.json and not args.dry_run:
                 raise ValueError('--json requires --dry-run')
-            with make_client(args.url, token, args.ca_file, args.allow_http) as client:
+            with make_client(args.url, token, args.ca_file, args.allow_http, args.request_timeout) as client:
                 if args.watch:
                     from .sync_loop import continuous_sync
                     def show(event):
@@ -345,7 +347,7 @@ def network_command(args):
                 print(f'Conflict: {path}', file=sys.stderr)
             return 2 if result['conflicts'] else 0
         if args.command == 'pull':
-            with make_client(args.url, token, args.ca_file, args.allow_http) as client:
+            with make_client(args.url, token, args.ca_file, args.allow_http, args.request_timeout) as client:
                 result = pull(client, root)
             print(f"Downloaded: {result['downloaded']}; unchanged: {result['unchanged']}")
             return 0
