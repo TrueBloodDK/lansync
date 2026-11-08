@@ -291,6 +291,9 @@ def network_command(args):
             return 2 if result['conflicts'] else 0
         if args.command == 'sync':
             from .sync import synchronize
+            def progress(event):
+                print(f"{event['direction']} {event['path']}: {event['bytes']}/{event['total']} bytes ({event['phase']})", file=sys.stderr, flush=True)
+            callback = progress if args.progress else None
             if args.dry_run and args.watch:
                 raise ValueError('--dry-run cannot be combined with --watch')
             if args.json and not args.dry_run:
@@ -306,9 +309,9 @@ def network_command(args):
                             print(event['report'], flush=True)
                     continuous_sync(client, root, args.state_dir, interval=args.interval,
                                     retry_max=args.retry_max, on_event=show,
-                                    local_events=args.local_events, event_debounce=args.event_debounce)
+                                    local_events=args.local_events, event_debounce=args.event_debounce, on_progress=callback)
                     return 0
-                result = synchronize(client, root, args.state_dir, dry_run=args.dry_run)
+                result = synchronize(client, root, args.state_dir, dry_run=args.dry_run, on_progress=callback)
             if args.dry_run:
                 if args.json:
                     import json

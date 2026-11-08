@@ -423,3 +423,31 @@ class SyncTests(unittest.TestCase):
         response=self.client.get('/v1/manifest')
         self.assertEqual(response.status_code,409)
         self.assertEqual((self.local/'file').read_bytes(),b'base')
+
+    def test_progress_and_committed_byte_totals(self):
+        events=[]
+        (self.server/'remote').write_bytes(b'remote data')
+        (self.local/'local').write_bytes(b'local data')
+        report=synchronize(self.client,self.local,self.state,on_progress=events.append)
+        self.assertEqual(report['uploaded_bytes'],10)
+        self.assertEqual(report['downloaded_bytes'],11)
+        self.assertEqual(len(report['operations']),2)
+        completed=[e for e in events if e['phase']=='completed']
+        self.assertEqual(len(completed),2)
+        for event in completed:
+            self.assertEqual(event['bytes'],event['total'])
+        saved=json.loads((self.state/'last-sync.json').read_text())
+        self.assertEqual(saved['operations'],report['operations'])
+        events.clear()
+        again=synchronize(self.client,self.local,self.state,on_progress=events.append)
+        self.assertEqual(again['uploaded_bytes']+again['downloaded_bytes'],0)
+        self.assertEqual(events,[])
+
+    def test_plan_byte_totals_without_progress(self):
+        events=[]
+        (self.server/'remote').write_bytes(b'123')
+        (self.local/'local').write_bytes(b'12345')
+        result=synchronize(self.client,self.local,self.state,dry_run=True,on_progress=events.append)
+        self.assertEqual(result['planned_download_bytes'],3)
+        self.assertEqual(result['planned_upload_bytes'],5)
+        self.assertEqual(events,[])

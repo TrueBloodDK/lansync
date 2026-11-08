@@ -74,7 +74,7 @@ def show_status(state, *, as_json=False):
     report = result['last_sync']
     if report is not None:
         print('Last completed pass:')
-        for field in ('completed_utc', 'duration_seconds', 'operation'):
+        for field in ('completed_utc', 'duration_seconds', 'operation', 'uploaded_bytes', 'downloaded_bytes'):
             if field in report:
                 print(f'  {field}: {report[field]}')
         for key in ('uploaded', 'downloaded', 'deleted_local', 'deleted_remote'):

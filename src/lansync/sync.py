@@ -149,7 +149,7 @@ def locked_sync_state(root, state):
         lock_path.unlink(missing_ok=True)
 
 
-def synchronize(client, root, state, *, dry_run=False):
+def synchronize(client, root, state, *, dry_run=False, on_progress=None):
     if dry_run:
         root, state = Path(root).expanduser().resolve(strict=True), Path(state).expanduser().resolve()
         if not root.is_dir() or state == root or root in state.parents:
@@ -158,7 +158,7 @@ def synchronize(client, root, state, *, dry_run=False):
             raise ValueError('Sync state is locked; stop the running sync first')
         return _synchronize(client, root, state, dry_run=True)
     with locked_sync_state(root, state) as (root, state):
-        return _synchronize(client, root, state)
+        return _synchronize(client, root, state, on_progress=on_progress)
 
 
 def resolve_conflict(client, root, state, key, choice):
@@ -172,7 +172,7 @@ def resolve_conflict(client, root, state, key, choice):
         return _synchronize(client, root, state, resolution=(key, choice, snapshot))
 
 
-def _synchronize(client, root, state, resolution=None, dry_run=False):
+def _synchronize(client, root, state, resolution=None, dry_run=False, on_progress=None):
     started = monotonic()
     if list((state / 'recovery').glob('*.pending.json')):
         raise ValueError('Unfinished file replacement; inspect recovery pending records before syncing')
@@ -196,6 +196,7 @@ def _synchronize(client, root, state, resolution=None, dry_run=False):
     combined = {e['path']: e for e in [*local.values(), *remote.values()] if not e.get('deleted')}
     name_conflicts = sorted({e['path'] for e in portability_errors(list(combined.values()))})
     report = {'uploaded': 0, 'downloaded': 0, 'deleted_local': 0, 'deleted_remote': 0, 'conflicts': name_conflicts}
+    report.update(uploaded_bytes=0, downloaded_bytes=0, operations=[])
     actions = []
     if resolution:
         key, choice, snapshot = resolution
@@ -249,9 +250,11 @@ def _synchronize(client, root, state, resolution=None, dry_run=False):
                 report['conflicts'].append(key)
                 continue
             operation = direction if fingerprint(desired) else ('delete_remote' if direction == 'upload' else 'delete_local')
-            plan.append({'path': key, 'operation': operation, 'kind': (desired or existing or {}).get('kind')})
+            plan.append({'path': key, 'operation': operation, 'kind': (desired or existing or {}).get('kind'), 'bytes': (desired or {}).get('size', 0) or 0})
         report['dry_run'] = True
         report['planned'] = plan
+        report['planned_upload_bytes'] = sum(a['bytes'] for a in plan if a['operation']=='upload')
+        report['planned_download_bytes'] = sum(a['bytes'] for a in plan if a['operation']=='download')
         return report
     for direction, key, left, right in sorted(actions, key=order):
         desired = left if direction == 'upload' else right
@@ -264,6 +267,8 @@ def _synchronize(client, root, state, resolution=None, dry_run=False):
             report['conflicts'].append(key)
             continue
         temporary = None
+        from .progress import TransferProgress
+        progress = TransferProgress(on_progress, direction, key, (desired.get('size') or 0) if fingerprint(desired) else 0)
         try:
             if direction == 'upload':
                 params = {'path': key, 'base_revision': (right or {}).get('revision', 0),
@@ -273,11 +278,19 @@ def _synchronize(client, root, state, resolution=None, dry_run=False):
                     source = safe_path(root, key)
                     # Server validates the streamed body against this snapshot hash.
                     with source.open('rb') as stream:
-                        response = client.put('/v1/change', params=params, content=iter(lambda: stream.read(BLOCK), b''))
+                        def chunks():
+                            while True:
+                                chunk = stream.read(BLOCK)
+                                if not chunk:
+                                    break
+                                yield chunk
+                                progress.advance(len(chunk))
+                        response = client.put('/v1/change', params=params, content=chunks())
                 else:
                     response = client.put('/v1/change', params=params, content=b'')
                 if response.status_code == 409:
                     report['conflicts'].append(key)
+                    progress.emit('conflict')
                     continue
                 response.raise_for_status()
                 baseline[key] = response.json()['entry']
@@ -297,6 +310,7 @@ def _synchronize(client, root, state, resolution=None, dry_run=False):
                                     raise ValueError('Download exceeds advertised size')
                                 digest.update(chunk)
                                 stream.write(chunk)
+                                progress.advance(len(chunk))
                         if size != desired['size'] or digest.hexdigest() != desired['sha256']:
                             raise ValueError('Download hash mismatch')
                         stream.flush()
@@ -305,15 +319,25 @@ def _synchronize(client, root, state, resolution=None, dry_run=False):
                     apply_change(root, key, desired if fingerprint(desired) else None, temporary, left, state / 'recovery')
                 except ValueError:
                     report['conflicts'].append(key)
+                    progress.emit('conflict')
                     continue
                 except OSError as exc:
                     if exc.errno not in {errno.ENOTEMPTY, errno.EEXIST}:
                         raise
                     report['conflicts'].append(key)
+                    progress.emit('conflict')
                     continue
                 baseline[key] = right
                 report['downloaded' if fingerprint(desired) else 'deleted_local'] += 1
+            size = (desired.get('size') or 0) if fingerprint(desired) else 0
+            if fingerprint(desired):
+                report['uploaded_bytes' if direction == 'upload' else 'downloaded_bytes'] += size
+            report['operations'].append({'path': key, 'operation': direction if fingerprint(desired) else ('delete_remote' if direction == 'upload' else 'delete_local'), 'bytes': size})
             export_manifest(saved, baseline_file)
+            progress.complete()
+        except BaseException:
+            progress.emit('failed')
+            raise
         finally:
             if temporary is not None:
                 temporary.unlink(missing_ok=True)

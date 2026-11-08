@@ -15,7 +15,7 @@ SCHEMAS = {
  'watch': {**SCAN,'debounce':(float,.5),'interval':(float,60),'max_delay':(float,5)},
  'serve': {**COMMON,'token_file':(Path,None),'host':(str,'127.0.0.1'),'port':(int,8765),'cert_file':(Path,None),'key_file':(Path,None),'allow_http':(bool,False),'allow_write':(bool,False),'exclude':(list,())},
  'pull': {**COMMON,**AUTH,'url':(str,None)},
- 'sync': {**COMMON,**AUTH,'url':(str,None),'watch':(bool,False),'dry_run':(bool,False),'json':(bool,False),'interval':(float,30),'retry_max':(float,300),'local_events':(bool,False),'event_debounce':(float,.5)},
+ 'sync': {**COMMON,**AUTH,'url':(str,None),'watch':(bool,False),'dry_run':(bool,False),'json':(bool,False),'interval':(float,30),'retry_max':(float,300),'local_events':(bool,False),'event_debounce':(float,.5),'progress':(bool,False)},
 }
 # pull has no persistent client state.
 SCHEMAS['pull'] = {k:v for k,v in SCHEMAS['pull'].items() if k!='state_dir'}

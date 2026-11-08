@@ -20,7 +20,7 @@ def retryable(error):
 
 
 def continuous_sync(client, root, state, *, interval=30.0, retry_max=300.0,
-                    stop=None, on_event=None, local_events=False, event_debounce=.5):
+                    stop=None, on_event=None, on_progress=None, local_events=False, event_debounce=.5):
     for value in (interval, retry_max, event_debounce):
         if not math.isfinite(value) or value <= 0:
             raise ValueError('Sync intervals must be positive finite numbers')
@@ -51,7 +51,8 @@ def continuous_sync(client, root, state, *, interval=30.0, retry_max=300.0,
                 if changes:
                     changes.changed.clear()
                 try:
-                    report = _synchronize(client, root, state)
+                    report = (_synchronize(client, root, state, on_progress=on_progress) if on_progress
+                              else _synchronize(client, root, state))
                 except httpx.HTTPError as exc:
                     if not retryable(exc):
                         raise
