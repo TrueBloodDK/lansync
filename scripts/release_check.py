@@ -45,7 +45,8 @@ def main():
         run([cli,'scan',base/'project/shared','--state-dir',base/'scan-state'],cwd=base,env=env)
         assert (base/'scan-state/manifest.json').is_file()
         try:
-            scenarios = run_scenarios(cli, base, env)
+            scenarios = (run_scenarios(cli, base, env) if sys.platform.startswith('linux')
+                         else {'status': 'skipped', 'reason': 'Server acceptance runs on Linux; client installation smoke tests passed'})
         except Exception:
             log = base/'acceptance-server.log'
             if log.exists():

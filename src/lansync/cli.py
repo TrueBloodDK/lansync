@@ -10,6 +10,7 @@ from .manifest import export_manifest
 from .scanner import scan_tree
 from .storage import Store
 from .policy import validate_patterns
+from .shutdown import termination_event
 
 
 from .locations import default_state
@@ -240,7 +241,8 @@ def execute(args):
         from .status import show_status, watch_status
         try:
             if args.watch:
-                return watch_status(args.state_dir, interval=args.interval, as_json=args.json)
+                with termination_event() as stop:
+                    return watch_status(args.state_dir, interval=args.interval, as_json=args.json, stop=stop)
             return show_status(args.state_dir, as_json=args.json)
         except (OSError, ValueError) as exc:
             print(f'Error: {exc}', file=sys.stderr)
@@ -270,8 +272,9 @@ def execute(args):
             logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
             print(f"Watching: {root}; stop with Ctrl+C", flush=True)
             try:
-                watch(root, database, destination, debounce=args.debounce,
-                      interval=args.interval, max_delay=args.max_delay, exclude_patterns=patterns)
+                with termination_event() as stop:
+                    watch(root, database, destination, debounce=args.debounce,
+                          interval=args.interval, max_delay=args.max_delay, exclude_patterns=patterns, stop=stop)
             except KeyboardInterrupt:
                 print("Watching stopped.")
             return 0
@@ -327,9 +330,10 @@ def network_command(args):
                             print(event['error'], file=sys.stderr, flush=True)
                         if event.get('report'):
                             print(event['report'], flush=True)
-                    continuous_sync(client, root, args.state_dir, interval=args.interval,
-                                    retry_max=args.retry_max, on_event=show,
-                                    local_events=args.local_events, event_debounce=args.event_debounce, on_progress=callback)
+                    with termination_event() as stop:
+                        continuous_sync(client, root, args.state_dir, interval=args.interval,
+                                        retry_max=args.retry_max, on_event=show, stop=stop,
+                                        local_events=args.local_events, event_debounce=args.event_debounce, on_progress=callback)
                     return 0
                 result = synchronize(client, root, args.state_dir, dry_run=args.dry_run, on_progress=callback)
             if args.dry_run:
