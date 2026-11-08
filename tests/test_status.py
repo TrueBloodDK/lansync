@@ -61,3 +61,34 @@ class StatusTests(unittest.TestCase):
             self.assertTrue(read_status(state)['loop_report_older'])
             (state/'loop-status.json').write_text(json.dumps(dict(status='synced',updated_utc='2026-11-04T13:00:00+00:00')))
             self.assertFalse(read_status(state)['loop_report_older'])
+
+    def test_monitor_waits_for_state_and_suppresses_duplicates(self):
+        from lansync.status import status_updates
+        with tempfile.TemporaryDirectory() as tmp:
+            state=Path(tmp)/'later'
+            class Stop:
+                count=0
+                def is_set(self): return self.count>=4
+                def wait(self, delay):
+                    self.count+=1
+                    if self.count==1: state.mkdir()
+                    if self.count==3: (state/'sync.lock').touch()
+            events=list(status_updates(state,interval=.01,stop=Stop()))
+            self.assertEqual(len(events),3)
+            self.assertFalse(events[0]['available'])
+            self.assertTrue(events[1]['available'])
+            self.assertTrue(events[2]['snapshot']['lock_present'])
+
+    def test_monitor_json_is_ndjson_and_invalid_interval_rejected(self):
+        from lansync.status import watch_status
+        with tempfile.TemporaryDirectory() as tmp:
+            class Stop:
+                done=False
+                def is_set(self): return self.done
+                def wait(self, delay): self.done=True
+            with contextlib.redirect_stdout(io.StringIO()) as output:
+                self.assertEqual(watch_status(tmp,as_json=True,stop=Stop()),0)
+            event=json.loads(output.getvalue())
+            self.assertTrue(event['available'])
+            self.assertIn('observed_utc',event)
+            with self.assertRaises(ValueError): watch_status(tmp,interval=0,stop=Stop())

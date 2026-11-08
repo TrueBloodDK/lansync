@@ -54,7 +54,10 @@ def read_status(state):
 
 
 def show_status(state, *, as_json=False):
-    result = read_status(state)
+    return render_status(read_status(state), as_json=as_json)
+
+
+def render_status(result, *, as_json=False):
     if as_json:
         print(json.dumps(result, ensure_ascii=True, indent=2))
         return 0
@@ -84,4 +87,43 @@ def show_status(state, *, as_json=False):
             print(f'  {path}')
     elif loop is None:
         print('No synchronization reports yet.')
+    return 0
+
+
+def status_updates(state, *, interval=1.0, stop=None):
+    """Yield changed disk snapshots; tolerate unavailable state during startup."""
+    from threading import Event
+    if not math.isfinite(interval) or interval <= 0:
+        raise ValueError('Status interval must be positive and finite')
+    stop = stop if stop is not None else Event()
+    previous = None
+    while not stop.is_set():
+        try:
+            snapshot = {'available': True, 'snapshot': read_status(state)}
+        except FileNotFoundError:
+            snapshot = {'available': False, 'reason': 'State directory does not exist yet'}
+        except (OSError, ValueError) as exc:
+            snapshot = {'available': False, 'reason': str(exc)}
+        if snapshot != previous:
+            previous = snapshot
+            yield snapshot
+        stop.wait(interval)
+
+
+def watch_status(state, *, interval=1.0, as_json=False, stop=None):
+    from datetime import timezone
+    try:
+        for event in status_updates(state, interval=interval, stop=stop):
+            timestamp = datetime.now(timezone.utc).isoformat()
+            if as_json:
+                print(json.dumps({'observed_utc': timestamp, **event}, ensure_ascii=True), flush=True)
+            elif not event['available']:
+                print(f"{timestamp} Status unavailable: {event['reason']}", flush=True)
+            else:
+                print(f'{timestamp} Saved state updated:', flush=True)
+                render_status(event['snapshot'])
+                import sys
+                sys.stdout.flush()
+    except KeyboardInterrupt:
+        return 0
     return 0

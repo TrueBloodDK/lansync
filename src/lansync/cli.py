@@ -60,11 +60,13 @@ def main(argv=None):
     restore.add_argument('--output', type=Path, required=True)
     status = commands.add_parser('status', help='Inspect saved synchronization reports')
     status.add_argument('--state-dir', type=Path, required=True)
+    status.add_argument('--watch', action='store_true', help='Monitor saved reports until Ctrl+C')
+    status.add_argument('--interval', type=float, default=1.0)
     status.add_argument('--json', action='store_true', help='Print machine-readable JSON')
     run = commands.add_parser('run', help='Run a command from a TOML configuration')
     run.add_argument('config', type=Path)
     run.add_argument('--check', action='store_true', help='Validate configuration syntax and argument combinations without running')
-    run.add_argument('--action', choices=['start', 'once', 'plan', 'status', 'doctor', 'resolve', 'recovery-list', 'recovery-verify', 'recovery-restore'], default='start')
+    run.add_argument('--action', choices=['start', 'once', 'plan', 'status', 'monitor', 'doctor', 'resolve', 'recovery-list', 'recovery-verify', 'recovery-restore'], default='start')
     run.add_argument('--id', help='Recovery copy ID for recovery-restore')
     run.add_argument('--output', type=Path, help='New destination file for recovery-restore')
     run.add_argument('--path', help='Relative conflict path for resolve')
@@ -231,8 +233,10 @@ def execute(args):
             print(f'Error: {exc}', file=sys.stderr)
             return 1
     if args.command == 'status':
-        from .status import show_status
+        from .status import show_status, watch_status
         try:
+            if args.watch:
+                return watch_status(args.state_dir, interval=args.interval, as_json=args.json)
             return show_status(args.state_dir, as_json=args.json)
         except (OSError, ValueError) as exc:
             print(f'Error: {exc}', file=sys.stderr)
