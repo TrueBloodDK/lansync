@@ -37,7 +37,7 @@ def action_arguments(config, request, original):
     if action == 'resolve':
         if not request.path or not request.choose:
             raise ValueError('resolve requires --path and --choose')
-        return ['resolve',*credentials,*options('state_dir'),'--choose='+request.choose,'--',config.url,str(config.root),request.path]
+        return ['resolve',*credentials,*options('state_dir'),'--choose='+request.choose,*(['--copy-path='+request.copy_path] if getattr(request,'copy_path',None) else []),'--',config.url,str(config.root),request.path]
     return ['sync',*credentials,*options('state_dir'),*(['--dry-run'] if action=='plan' else []),*(['--json'] if request.json else []),'--',config.url,str(config.root)]
 
 
@@ -57,7 +57,7 @@ def prepare_action(config, request):
     elif action in {'status','monitor'}:
         values.update(command='status',json=request.json,watch=action=='monitor',interval=1.0)
     elif action=='resolve':
-        values.update(command='resolve',path=request.path,choose=request.choose)
+        values.update(command='resolve',path=request.path,choose=request.choose,copy_path=getattr(request,'copy_path',None))
     elif action.startswith('recovery-'):
         values.update(command='recovery',recovery_command=action.split('-')[1],json=request.json)
         if action=='recovery-restore':
@@ -67,6 +67,10 @@ def prepare_action(config, request):
 
 def validate_request(config, request):
     action = request.action
+    if getattr(request, 'copy_path', None) and (action != 'resolve' or request.choose != 'both'):
+        raise ValueError('--copy-path requires resolve --choose both')
+    if action == 'resolve' and request.choose == 'both' and not getattr(request, 'copy_path', None):
+        raise ValueError('--choose both requires --copy-path')
     allowed = {'start','once','plan','status','monitor','doctor','resolve','recovery-list','recovery-verify','recovery-restore'}
     if action not in allowed:
         raise ValueError('Unknown project action')
@@ -80,7 +84,7 @@ def validate_request(config, request):
         raise ValueError('This action requires a sync configuration')
     if (action in {'status','monitor'} or action.startswith('recovery-')) and not getattr(config,'state_dir',None):
         raise ValueError('Set state_dir explicitly for this action')
-    if action=='resolve' and (not request.path or request.choose not in {'local','remote'}):
+    if action=='resolve' and (not request.path or request.choose not in {'local','remote','both'}):
         raise ValueError('resolve requires --path and --choose local/remote')
     if action=='recovery-restore' and (not request.id or request.output is None):
         raise ValueError('recovery-restore requires --id and --output')

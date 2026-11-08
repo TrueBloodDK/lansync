@@ -451,3 +451,39 @@ class SyncTests(unittest.TestCase):
         self.assertEqual(result['planned_download_bytes'],3)
         self.assertEqual(result['planned_upload_bytes'],5)
         self.assertEqual(events,[])
+
+    def test_keep_both_then_sync_preserved_copy(self):
+        from lansync.sync import resolve_conflict
+        self.seed()
+        (self.local/'file').write_bytes(b'local version')
+        (self.server/'file').write_bytes(b'remote version')
+        self.sync()
+        result=resolve_conflict(self.client,self.local,self.state,'file','both',copy_path='local-version.txt')
+        self.assertEqual(result['preserved_copy'],'local-version.txt')
+        self.assertEqual((self.local/'file').read_bytes(),b'remote version')
+        self.assertEqual((self.local/'local-version.txt').read_bytes(),b'local version')
+        self.assertFalse((self.server/'local-version.txt').exists())
+        self.assertFalse(self.sync()['conflicts'])
+        self.assertEqual((self.server/'local-version.txt').read_bytes(),b'local version')
+
+    def test_keep_both_rejects_existing_and_stale_copy(self):
+        from lansync.sync import resolve_conflict
+        self.seed()
+        (self.local/'file').write_bytes(b'left');(self.server/'file').write_bytes(b'right')
+        self.sync()
+        (self.server/'occupied').write_bytes(b'do not overwrite')
+        with self.assertRaises(ValueError):
+            resolve_conflict(self.client,self.local,self.state,'file','both',copy_path='occupied')
+        self.assertFalse((self.local/'occupied').exists())
+        (self.local/'file').write_bytes(b'newer left')
+        with self.assertRaisesRegex(ValueError,'changed since detection'):
+            resolve_conflict(self.client,self.local,self.state,'file','both',copy_path='copy')
+        self.assertFalse((self.local/'copy').exists())
+        self.assertEqual((self.local/'file').read_bytes(),b'newer left')
+
+    def test_keep_both_rejects_deletion_conflict(self):
+        from lansync.sync import resolve_conflict
+        self.seed(); (self.local/'file').unlink(); (self.server/'file').write_bytes(b'right'); self.sync()
+        with self.assertRaisesRegex(ValueError,'two existing files'):
+            resolve_conflict(self.client,self.local,self.state,'file','both',copy_path='copy')
+        self.assertFalse((self.local/'copy').exists())

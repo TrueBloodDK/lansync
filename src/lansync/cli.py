@@ -71,7 +71,8 @@ def main(argv=None):
     run.add_argument('--id', help='Recovery copy ID for recovery-restore')
     run.add_argument('--output', type=Path, help='New destination file for recovery-restore')
     run.add_argument('--path', help='Relative conflict path for resolve')
-    run.add_argument('--choose', choices=['local', 'remote'])
+    run.add_argument('--copy-path', help='New relative path for the local copy when choosing both')
+    run.add_argument('--choose', choices=['local', 'remote', 'both'])
     run.add_argument('--json', action='store_true', help='Structured output for plan, status, doctor or recovery')
     from .config import SCHEMAS, REQUIRED
     for name, schema in SCHEMAS.items():
@@ -97,7 +98,8 @@ def main(argv=None):
     resolve.add_argument('url')
     resolve.add_argument('root', type=Path)
     resolve.add_argument('path', help='Relative conflicted file path')
-    resolve.add_argument('--choose', choices=['local', 'remote'], required=True)
+    resolve.add_argument('--copy-path', help='New relative path for the local copy when choosing both')
+    resolve.add_argument('--choose', choices=['local', 'remote', 'both'], required=True)
     resolve.add_argument('--state-dir', type=Path, required=True)
     resolve.add_argument('--token-file', type=Path, required=True)
     resolve.add_argument('--ca-file', type=Path)
@@ -304,7 +306,7 @@ def network_command(args):
         if args.command == 'resolve':
             from .sync import resolve_conflict
             with make_client(args.url, token, args.ca_file, args.allow_http, args.request_timeout) as client:
-                result = resolve_conflict(client, root, args.state_dir, args.path, args.choose)
+                result = resolve_conflict(client, root, args.state_dir, args.path, args.choose, copy_path=args.copy_path)
             print(result)
             return 2 if result['conflicts'] else 0
         if args.command == 'sync':

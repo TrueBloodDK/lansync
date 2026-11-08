@@ -161,15 +161,17 @@ def synchronize(client, root, state, *, dry_run=False, on_progress=None):
         return _synchronize(client, root, state, on_progress=on_progress)
 
 
-def resolve_conflict(client, root, state, key, choice):
-    if choice not in {'local', 'remote'}:
-        raise ValueError('Choose local or remote')
+def resolve_conflict(client, root, state, key, choice, *, copy_path=None):
+    if choice not in {'local', 'remote', 'both'}:
+        raise ValueError('Choose local, remote or both')
+    if (choice == 'both') != bool(copy_path):
+        raise ValueError('A new --copy-path is required only for --choose both')
     with locked_sync_state(root, state) as (root, state):
         report = json.loads((state / 'last-sync.json').read_text(encoding='utf-8'))
         snapshot = report.get('conflict_versions', {}).get(key)
         if key not in report.get('conflicts', []) or snapshot is None:
             raise ValueError('No recorded conflict snapshot; run sync first')
-        return _synchronize(client, root, state, resolution=(key, choice, snapshot))
+        return _synchronize(client, root, state, resolution=(key, choice, snapshot, copy_path))
 
 
 def _synchronize(client, root, state, resolution=None, dry_run=False, on_progress=None):
@@ -199,7 +201,7 @@ def _synchronize(client, root, state, resolution=None, dry_run=False, on_progres
     report.update(uploaded_bytes=0, downloaded_bytes=0, operations=[])
     actions = []
     if resolution:
-        key, choice, snapshot = resolution
+        key, choice, snapshot = resolution[:3]
         safe_path(root, key)
         left, right = local.get(key), remote.get(key)
         if (fingerprint(left) != fingerprint(snapshot.get('local')) or
@@ -210,6 +212,35 @@ def _synchronize(client, root, state, resolution=None, dry_run=False, on_progres
             raise ValueError('Excluded paths and name collisions require manual resolution')
         if any(e and not e.get('deleted') and e['kind'] != 'file' for e in (left, right)):
             raise ValueError('Directory conflicts require manual resolution')
+        if choice == 'both':
+            if not fingerprint(left) or not fingerprint(right):
+                raise ValueError('Keep both requires two existing files; resolve deletion conflicts explicitly')
+            copy_key = resolution[3]
+            target = safe_path(root, copy_key)
+            if copy_key in local or copy_key in remote or excluded(copy_key, patterns):
+                raise ValueError('Copy path must be new on both sides and not excluded')
+            candidate = {**left, 'path': copy_key}
+            if portability_errors([*combined.values(), candidate]):
+                raise ValueError('Copy path conflicts with existing portable names')
+            from .network import check_live_spelling
+            check_live_spelling(root, copy_key)
+            # Require an existing parent to avoid leaving partially created trees.
+            copy_temporary = None
+            try:
+                with tempfile.NamedTemporaryFile(dir=target.parent, prefix='.lansync-', suffix='.tmp', delete=False) as output:
+                    copy_temporary = Path(output.name)
+                    with safe_path(root, key).open('rb') as source:
+                        for chunk in iter(lambda: source.read(BLOCK), b''):
+                            output.write(chunk)
+                    output.flush()
+                    os.fsync(output.fileno())
+                if fingerprint(disk_entry(copy_temporary)) != fingerprint(left):
+                    raise ValueError('Local file changed while preserving conflict copy')
+                publish_new(copy_temporary, safe_path(root, copy_key))
+                report['preserved_copy'] = copy_key
+            finally:
+                if copy_temporary is not None:
+                    copy_temporary.unlink(missing_ok=True)
         actions.append(('upload' if choice == 'local' else 'download', key, left, right))
     for key in sorted(set(local) | set(remote) | set(baseline)):
         if resolution:

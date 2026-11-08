@@ -153,3 +153,14 @@ class ConfigTests(unittest.TestCase):
             self.assertEqual(len(calls),1)
             self.assertTrue((base/'state/manifest.json').exists())
             self.assertTrue((base/'run.log').exists())
+
+    def test_keep_both_workflow_preserves_copy_path(self):
+        from types import SimpleNamespace
+        from lansync.workflow import prepare_action
+        config=SimpleNamespace(command='sync',root=Path('/root'),url='https://localhost',state_dir=Path('/state'))
+        request=SimpleNamespace(action='resolve',path='file.txt',choose='both',copy_path='local.txt',json=False,id=None,output=None)
+        result=prepare_action(config,request)
+        self.assertEqual(result.copy_path,'local.txt')
+        self.assertEqual(result.choose,'both')
+        request.copy_path=None
+        with self.assertRaises(ValueError): prepare_action(config,request)
