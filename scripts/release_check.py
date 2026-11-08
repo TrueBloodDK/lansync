@@ -3,12 +3,14 @@ import argparse
 import hashlib
 import json
 import platform
+import shutil
 import os
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import venv
+from acceptance import run_scenarios
 
 
 def run(args, **kwargs):
@@ -42,8 +44,17 @@ def main():
         run([cli,'run',base/'project/project.toml','--check'],cwd=base,env=env)
         run([cli,'scan',base/'project/shared','--state-dir',base/'scan-state'],cwd=base,env=env)
         assert (base/'scan-state/manifest.json').is_file()
+        try:
+            scenarios = run_scenarios(cli, base, env)
+        except Exception:
+            log = base/'acceptance-server.log'
+            if log.exists():
+                shutil.copyfile(log, output/'acceptance-server.log')
+            (output/'verification.json').write_text(json.dumps({'installation_smoke_test': 'failed', 'stage': 'https_acceptance'}, indent=2), encoding='utf-8')
+            raise
+        dependencies = subprocess.check_output([str(python), '-m', 'pip', 'freeze'], cwd=base, env=env, text=True)
     artifacts = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in output.iterdir() if p.suffix in {'.whl', '.gz'}}
-    report = {'installation_smoke_test': 'passed', 'python': sys.version, 'platform': platform.platform(), 'artifacts_sha256': artifacts}
+    report = {'installation_smoke_test': 'passed', 'python': sys.version, 'platform': platform.platform(), 'artifacts_sha256': artifacts, 'acceptance': scenarios, 'installed_dependencies': dependencies.splitlines()}
     (output/'verification.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
     print('Wheel installation smoke test passed:',output)
 
