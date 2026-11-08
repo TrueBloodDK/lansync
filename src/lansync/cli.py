@@ -12,13 +12,7 @@ from .storage import Store
 from .policy import validate_patterns
 
 
-def default_state(root):
-    if os.name == "nt":
-        base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
-    else:
-        base = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state"))
-    key = hashlib.sha256(str(root).encode("utf-8")).hexdigest()[:24]
-    return base / "lansync" / key
+from .locations import default_state
 
 
 def outside_root(path, root):
@@ -31,6 +25,9 @@ def main(argv=None):
     from . import __version__
     parser.add_argument("--version", action="version", version=f"LANSync {__version__}")
     commands = parser.add_subparsers(dest="command", required=True)
+    inspect = commands.add_parser('inspect', help='Check local project paths and credentials without connecting')
+    inspect.add_argument('config', type=Path)
+    inspect.add_argument('--json', action='store_true')
     credentials = commands.add_parser('credentials', help='Create LAN TLS credentials or export a client bundle')
     credential_commands = credentials.add_subparsers(dest='credential_command', required=True)
     create = credential_commands.add_parser('create')
@@ -110,6 +107,21 @@ def main(argv=None):
 
 
 def execute(args):
+    if args.command == 'inspect':
+        import json
+        from .project_inspection import inspect_project
+        try:
+            report = inspect_project(args.config)
+            if args.json:
+                print(json.dumps(report, ensure_ascii=True, indent=2))
+            else:
+                for check in report['checks']:
+                    print(f"{'OK' if check['ok'] else 'FAIL'} {check['check']}: {check['detail']}")
+                print('Local checks only; no network request or write test was performed.')
+            return 0 if report['ok'] else 1
+        except (OSError, ValueError) as exc:
+            print(f'Error: {exc}', file=sys.stderr)
+            return 1
     if args.command == 'credentials':
         from .credentials import create_credentials, export_client_credentials
         try:
