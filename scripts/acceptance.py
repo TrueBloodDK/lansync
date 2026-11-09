@@ -5,12 +5,35 @@ import os
 from pathlib import Path
 import socket
 import subprocess
+import sys
 import time
 
 
 def check(condition, message):
     if not condition:
         raise RuntimeError(message)
+
+
+def stop_process(process):
+    if process is None or process.poll() is not None:
+        return
+    process.terminate()
+    try:
+        process.wait(timeout=15)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=10)
+        raise RuntimeError('Process did not stop gracefully within 15 seconds')
+
+
+def wait_until(predicate, processes, message, timeout=30):
+    deadline = time.monotonic() + timeout
+    while True:
+        check(all(p.poll() is None for p in processes), 'Background process exited: ' + message)
+        if predicate():
+            return
+        check(time.monotonic() < deadline, 'Timed out: ' + message)
+        time.sleep(.1)
 
 
 def run_scenarios(cli, base, env):
@@ -39,6 +62,8 @@ def run_scenarios(cli, base, env):
     record('project initialization and client credential export')
     log=(base/'acceptance-server.log').open('wb')
     process=subprocess.Popen([str(cli),'run',str(config)],cwd=base,env=env,stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT)
+    background = None
+    client_log = None
     project=client/'project.toml'
     def action(name,*args,expected=0): return command('run',project,'--action',name,*args,expected=expected)
     try:
@@ -79,6 +104,14 @@ def run_scenarios(cli, base, env):
         action('resolve','--path','conflict.txt','--choose','local')
         check((a/'conflict.txt').read_bytes()==b'local choice','Resolution failed')
         record('conflict status and explicit local resolution')
+        (a/'conflict.txt').write_bytes(b'remote preserved'); (b/'conflict.txt').write_bytes(b'local preserved')
+        action('once',expected=2)
+        action('resolve','--path','conflict.txt','--choose','both','--copy-path','local-copy.txt')
+        check((b/'local-copy.txt').read_bytes()==b'local preserved','Local conflict copy missing')
+        check((b/'conflict.txt').read_bytes()==b'remote preserved','Remote conflict version missing')
+        action('once')
+        check((a/'local-copy.txt').read_bytes()==b'local preserved','Preserved copy not uploaded')
+        record('keep both conflict versions and synchronize preserved copy')
         for root in (server,client):
             report=json.loads(command('recovery','verify','--state-dir',root/'state','--json'))
             check(report['problems']==0 and report['verified']>0,'Recovery verification failed')
@@ -93,10 +126,89 @@ def run_scenarios(cli, base, env):
             return {p.relative_to(root).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in root.rglob('*') if p.is_file()}
         check(hashes(a)==hashes(b),'Final trees differ')
         record('final tree hashes match')
+        # Real processes, persistent state and ordinary SIGTERM; no crash simulation.
+        text=project.read_text(encoding='utf-8').replace('interval = 30\n','interval = 1\n').replace('retry_max = 300\n','retry_max = 2\n')
+        project.write_text(text+'request_timeout = 2\n',encoding='utf-8')
+        client_log=(base/'acceptance-client.log').open('wb')
+        def start_client():
+            return subprocess.Popen([str(cli),'run',str(project)],cwd=base,env=env,
+                                    stdin=subprocess.DEVNULL,stdout=client_log,stderr=subprocess.STDOUT)
+        def saved_status():
+            path=client/'state/loop-status.json'
+            return json.loads(path.read_text(encoding='utf-8')) if path.exists() else {}
+        def has_content(path, content):
+            return path.is_file() and path.read_bytes()==content
+        background=start_client()
+        wait_until(lambda: saved_status().get('status')=='synced',[process,background],'initial background sync')
+        (b/'background.txt').write_bytes(b'local event')
+        wait_until(lambda: has_content(a/'background.txt',b'local event') and
+                   saved_status().get('status')=='synced' and (saved_status().get('report') or {}).get('uploaded',0)>0,
+                   [process,background],'background upload')
+        (a/'background.txt').write_bytes(b'server polling')
+        wait_until(lambda: has_content(b/'background.txt',b'server polling') and
+                   saved_status().get('status')=='synced' and (saved_status().get('report') or {}).get('downloaded',0)>0,
+                   [process,background],'background download')
+        record('continuous upload and download')
+        stop_process(process)
+        wait_until(lambda: saved_status().get('status')=='retrying',[background],'retry after server shutdown')
+        (b/'offline.txt').write_bytes(b'queued while offline')
+        process=subprocess.Popen([str(cli),'run',str(config)],cwd=base,env=env,
+                                 stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT)
+        wait_until(lambda: has_content(a/'offline.txt',b'queued while offline') and saved_status().get('status')=='synced',
+                   [process,background],'reconnect and upload offline edit')
+        record('server restart and automatic client reconnect')
+        stop_process(background)
+        check(background.returncode==0,'Client SIGTERM exit code is not zero')
+        check(not (client/'state/sync.lock').exists(),'Client lock remains after SIGTERM')
+        check(saved_status().get('status')=='stopped','Stopped state not saved')
+        (a/'while-stopped.txt').write_bytes(b'persisted baseline')
+        background=start_client()
+        wait_until(lambda: has_content(b/'while-stopped.txt',b'persisted baseline'),
+                   [process,background],'client restart with previous state')
+        stop_process(background)
+        check(background.returncode==0 and not (client/'state/sync.lock').exists(),'Restarted client did not stop cleanly')
+        check(hashes(a)==hashes(b),'Trees differ after restart')
+        record('SIGTERM cleanup and client restart with persistent state')
         return scenarios
     finally:
-        process.terminate()
-        try: process.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            process.kill(); process.wait(timeout=10)
-        log.close()
+        try:
+            stop_process(background)
+        finally:
+            try:
+                stop_process(process)
+            finally:
+                if client_log is not None:
+                    client_log.close()
+                log.close()
+
+
+def main():
+    import argparse
+    from datetime import datetime, timezone
+    import platform
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--cli',type=Path,required=True,help='Installed Linux lansync executable')
+    parser.add_argument('--output',type=Path,required=True,help='New directory for isolated projects, logs and report')
+    args=parser.parse_args()
+    if not sys.platform.startswith('linux'):
+        parser.error('Server acceptance requires Linux')
+    cli=args.cli.expanduser().resolve(strict=True)
+    base=args.output.expanduser().absolute()
+    base.mkdir(parents=True,exist_ok=False,mode=0o700)
+    env=dict(os.environ)
+    env.pop('PYTHONPATH',None)
+    report={'created_utc':datetime.now(timezone.utc).isoformat(),'platform':platform.platform(),
+            'cli':str(cli),'result':'failed'}
+    try:
+        report['scenarios']=run_scenarios(cli,base,env)
+        report['result']='passed'
+    except Exception as exc:
+        report['error']=str(exc)
+        raise
+    finally:
+        (base/'verification.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
+    print(f"Passed {len(report['scenarios'])} scenarios; report: {base / 'verification.json'}")
+
+
+if __name__=='__main__':
+    main()
