@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import secrets
 import ssl
+from .durability import make_directory, sync_directory
 
 
 def write_bundle(destination, files):
@@ -13,11 +14,14 @@ def write_bundle(destination, files):
         if not destination.is_dir() or any(destination.iterdir()):
             raise ValueError('Credential directory must be new or empty')
     else:
-        destination.mkdir(mode=0o700,parents=True,exist_ok=False)
+        make_directory(destination,mode=0o700,exist_ok=False)
     for name,data in files.items():
         descriptor=os.open(destination/name,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
         with os.fdopen(descriptor,'wb') as stream:
             stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        sync_directory(destination)
     return destination
 
 

@@ -1,5 +1,6 @@
 """Inspect and export recovery copies without overwriting user files."""
 import json
+import os
 import re
 import shutil
 import tempfile
@@ -73,6 +74,8 @@ def restore_copy(state, identifier, destination):
             temporary = Path(stream.name)
             with backup.open('rb') as source:
                 shutil.copyfileobj(source, stream, length=1024 * 1024)
+            stream.flush()
+            os.fsync(stream.fileno())
         info, digest = hash_file(temporary)
         if info.st_size != data['previous']['size'] or digest != data['previous']['sha256']:
             raise ValueError('Recovery copy hash or size mismatch')

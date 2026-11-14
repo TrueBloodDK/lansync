@@ -12,6 +12,7 @@ from contextlib import contextmanager
 
 from .manifest import export_manifest
 from .scanner import hash_file, scan_tree
+from .durability import make_directory, sync_directory, sync_existing_file
 
 
 def fingerprint(entry):
@@ -57,7 +58,9 @@ def publish_new(source, target):
         os.rename(source, target)
     else:
         os.link(source, target)
+        sync_directory(target.parent)
         source.unlink()
+        sync_directory(source.parent)
 
 
 def apply_change(root, key, desired, temporary, expected, recovery):
@@ -73,17 +76,19 @@ def apply_change(root, key, desired, temporary, expected, recovery):
     if desired and desired['kind'] == 'directory':
         if current:
             raise ValueError('File/directory replacement requires manual resolution')
-        target.mkdir(parents=True, exist_ok=False)
+        make_directory(target, exist_ok=False)
         return
     if current and current['kind'] == 'directory':
         if desired:
             raise ValueError('Directory/file replacement requires manual resolution')
         target.rmdir()  # Never remove a non-empty directory recursively.
+        sync_directory(target.parent)
         return
-    target.parent.mkdir(parents=True, exist_ok=True)
+    make_directory(target.parent)
     backup = None
     if current:
-        recovery.mkdir(parents=True, exist_ok=True)
+        make_directory(recovery)
+        sync_existing_file(target)
         # Recovery must be on the same volume as the root for atomic rename.
         backup = recovery / (uuid.uuid4().hex + '.bak')
         export_manifest({'path': key, 'previous': current}, backup.with_suffix('.json'))
@@ -91,6 +96,8 @@ def apply_change(root, key, desired, temporary, expected, recovery):
         export_manifest({'path': key, 'backup': backup.name, 'previous': current}, pending)
         try:
             os.rename(target, backup)
+            sync_directory(recovery)
+            sync_directory(target.parent)
             if fingerprint(disk_entry(backup)) != fingerprint(expected):
                 raise ValueError('File changed during replacement; preserved in recovery')
             if desired:
@@ -101,9 +108,11 @@ def apply_change(root, key, desired, temporary, expected, recovery):
             if not backup.exists():
                 pending.unlink(missing_ok=True)
                 backup.with_suffix('.json').unlink(missing_ok=True)
+                sync_directory(recovery)
             raise
         else:
             pending.unlink(missing_ok=True)
+            sync_directory(recovery)
     elif desired:
         publish_new(temporary, safe_path(root, key))
 
@@ -136,17 +145,22 @@ def locked_sync_state(root, state):
         raise ValueError('Sync root must be a directory')
     if state == root or root in state.parents:
         raise ValueError('Sync state must be outside the synchronized folder')
-    state.mkdir(parents=True, exist_ok=True)
+    make_directory(state)
     if state.stat().st_dev != root.stat().st_dev:
         raise ValueError('Sync state and root must be on the same volume for recovery renames')
     # Exclusive lock file prevents two local sync processes from racing.
     lock_path = state / 'sync.lock'
     descriptor = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-    os.close(descriptor)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+    sync_directory(state)
     try:
         yield root, state
     finally:
         lock_path.unlink(missing_ok=True)
+        sync_directory(state)
 
 
 def synchronize(client, root, state, *, dry_run=False, on_progress=None):
@@ -329,7 +343,7 @@ def _synchronize(client, root, state, resolution=None, dry_run=False, on_progres
             else:
                 if fingerprint(desired) and desired['kind'] == 'file':
                     target = safe_path(root, key)
-                    target.parent.mkdir(parents=True, exist_ok=True)
+                    make_directory(target.parent)
                     with tempfile.NamedTemporaryFile(dir=target.parent, prefix='.lansync-', suffix='.tmp', delete=False) as stream:
                         temporary = Path(stream.name)
                         digest, size = hashlib.sha256(), 0

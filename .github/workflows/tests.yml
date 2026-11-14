@@ -25,3 +25,6 @@ jobs:
       - name: Linux load-test harness smoke check
         if: runner.os == 'Linux' && matrix.python == '3.13'
         run: python scripts/soak.py --cli "$(command -v lansync)" --output .soak-smoke --duration 2 --files 5 --large-mib 1
+      - name: Linux process-crash recovery checks
+        if: runner.os == 'Linux' && matrix.python == '3.13'
+        run: python scripts/crash_check.py run --output .crash-check

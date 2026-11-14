@@ -13,6 +13,7 @@ from threading import Lock
 from urllib.parse import urlsplit
 
 import httpx
+from .durability import make_directory, sync_directory
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from starlette.concurrency import run_in_threadpool
 from starlette.background import BackgroundTask
@@ -72,7 +73,7 @@ def create_app(root, database, token, exclude_patterns=(), allow_write=False):
     database = Path(database).resolve()
     if not root.is_dir() or root == database or root in database.parents:
         raise ValueError('Database must be outside the shared directory')
-    database.parent.mkdir(parents=True, exist_ok=True)
+    make_directory(database.parent)
     if allow_write and database.parent.stat().st_dev != root.stat().st_dev:
         raise ValueError('Writable server state and root must be on the same volume')
     patterns = validate_patterns(exclude_patterns)
@@ -126,7 +127,7 @@ def create_app(root, database, token, exclude_patterns=(), allow_write=False):
                 or (kind == 'file' and not re.fullmatch('[0-9a-f]{64}', sha256))
                 or (kind != 'file' and size != 0)):
             raise HTTPException(400, 'Invalid change metadata')
-        database.parent.mkdir(parents=True, exist_ok=True)
+        make_directory(database.parent)
         temporary = None
         try:
             with tempfile.NamedTemporaryFile(dir=database.parent, prefix='upload-', delete=False) as stream:
@@ -286,14 +287,14 @@ def pull(client, root):
     for item in sorted(entries, key=lambda e: (e['path'].count('/'), e['path'])):
         target = safe_path(root, item['path'])
         if item['kind'] == 'directory':
-            target.mkdir(parents=True, exist_ok=True)
+            make_directory(target)
             continue
         if target.exists():
             if not target.is_file() or hash_file(target)[1] != item['sha256']:
                 raise ValueError(f"Local conflict: {item['path']}")
             unchanged += 1
             continue
-        target.parent.mkdir(parents=True, exist_ok=True)
+        make_directory(target.parent)
         temporary = None
         try:
             with tempfile.NamedTemporaryFile(dir=target.parent, prefix='.lansync-', suffix='.tmp', delete=False) as output:
@@ -319,6 +320,7 @@ def pull(client, root):
                 os.rename(temporary, target)  # Windows rename refuses an existing target.
             else:
                 os.link(temporary, target)
+                sync_directory(target.parent)
             downloaded += 1
         finally:
             if temporary is not None:

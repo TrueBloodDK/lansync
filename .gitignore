@@ -7,3 +7,4 @@ build/
 dist/
 .release-check/
 .soak-smoke/
+.crash-check/

@@ -5,11 +5,12 @@ from pathlib import Path
 import sqlite3
 import uuid
 from .policy import excluded as is_excluded, portability_errors
+from .durability import make_directory
 
 
 class Store:
     def __init__(self, database: Path, root: Path):
-        database.parent.mkdir(parents=True, exist_ok=True)
+        make_directory(database.parent)
         self.connection = sqlite3.connect(database)
         try:
             with self.connection:

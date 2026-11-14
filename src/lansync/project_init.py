@@ -1,6 +1,8 @@
 """Create a self-contained project skeleton without overwriting existing data."""
 from pathlib import Path
 import json
+import os
+from .durability import sync_directory
 
 
 def initialize(directory, mode, url=None):
@@ -23,4 +25,8 @@ def initialize(directory, mode, url=None):
     config=directory/'project.toml'
     with config.open('x',encoding='utf-8') as stream:
         stream.write(text)
+        stream.flush()
+        os.fsync(stream.fileno())
+    sync_directory(directory)
+    sync_directory(directory.parent)
     return config

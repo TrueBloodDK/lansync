@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import platform
 import socket
+import signal
 import statistics
 import subprocess
 import sys
@@ -20,8 +21,17 @@ from acceptance import check, stop_process, wait_until
 
 def save(path, value):
     temporary = path.with_suffix('.tmp')
-    temporary.write_text(json.dumps(value, indent=2), encoding='utf-8')
+    with temporary.open('w', encoding='utf-8') as stream:
+        json.dump(value, stream, indent=2)
+        stream.flush()
+        os.fsync(stream.fileno())
     temporary.replace(path)
+    if os.name == 'posix':
+        descriptor = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
 
 
 def digest(path):
@@ -107,6 +117,8 @@ def run(args, report):
                        processes, 'initial tree transfer', args.timeout)
             check(tree(a) == tree(b), 'Initial tree differs')
             report['initial_tree_seconds'] = time.monotonic() - started
+            report['stage'] = 'large_transfers'
+            save(base / 'verification.json', report)
             report['large_transfers'] = []
             for direction, source, target, byte in (('download', a, b, b'd'), ('upload', b, a, b'u')):
                 previous = status().get('last_success_utc')
@@ -130,6 +142,8 @@ def run(args, report):
             begin = time.monotonic()
             operations = []
             report['operations'] = operations
+            report['stage'] = 'repeated_changes'
+            checkpoint = begin
             while not operations or time.monotonic() - begin < args.duration:
                 index = len(operations)
                 source, target = (a, b) if index % 2 == 0 else (b, a)
@@ -152,6 +166,11 @@ def run(args, report):
                                    'seconds': time.monotonic() - operation_start})
                 save(base / 'progress.json', {'completed_operations': len(operations),
                                              'elapsed_seconds': time.monotonic() - begin, 'last_sample': samples[-1]})
+                if time.monotonic() - checkpoint >= 30:
+                    report['observed_change_seconds'] = time.monotonic() - begin
+                    report['memory_samples'] = list(samples)
+                    save(base / 'verification.json', report)
+                    checkpoint = time.monotonic()
                 if len(operations) % 10 == 0:
                     print(f'{len(operations)} operations, {time.monotonic() - begin:.1f} seconds', flush=True)
             report['change_phase_seconds'] = time.monotonic() - begin
@@ -204,17 +223,24 @@ def main():
     args.output = args.output.expanduser().absolute()
     args.output.mkdir(parents=True, exist_ok=False, mode=0o700)
     report = {'created_utc': datetime.now(timezone.utc).isoformat(), 'platform': platform.platform(),
-              'python': platform.python_version(), 'result': 'failed',
+              'python': platform.python_version(), 'result': 'running', 'stage': 'setup',
               'parameters': {'duration': args.duration, 'files': args.files, 'large_mib': args.large_mib},
               'method': 'Linux loopback HTTPS; sequential edits; full scans, polling and hashing included in latency. RSS sampled every 0.5s, not exact peak. No network speed or leak guarantee.'}
     started = time.monotonic()
+    save(args.output / 'verification.json', report)
+    def interrupted(signum, frame):
+        raise KeyboardInterrupt('SIGTERM requested interruption')
+    previous = signal.signal(signal.SIGTERM, interrupted)
     try:
         run(args, report)
         report['result'] = 'passed'
+        report['stage'] = 'complete'
     except BaseException as exc:
+        report['result'] = 'interrupted' if isinstance(exc, KeyboardInterrupt) else 'failed'
         report['error'] = f'{type(exc).__name__}: {exc}'
         raise
     finally:
+        signal.signal(signal.SIGTERM, previous)
         report['total_seconds'] = time.monotonic() - started
         save(args.output / 'verification.json', report)
     print(f'Passed; report: {args.output / "verification.json"}', flush=True)
