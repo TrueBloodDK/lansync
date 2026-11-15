@@ -13,9 +13,13 @@ dependencies = ["watchdog>=6,<8", "fastapi>=0.115,<1", "uvicorn>=0.30,<1", "http
 [project.optional-dependencies]
 setup = ["trustme>=1.2,<2"]
 dev = ["pytest>=8,<10", "trustme>=1.2,<2"]
+gui = ["PySide6>=6.8,<7"]
 
 [project.scripts]
 lansync = "lansync.cli:main"
+
+[project.gui-scripts]
+lansync-gui = "lansync.gui:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
