@@ -1,17 +1,18 @@
 """First desktop workflow: open, diagnose, preview, synchronize and stop."""
 import json
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from PySide6.QtCore import QSettings, QTimer, Qt
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                               QLabel, QPushButton, QFileDialog, QMessageBox,
-                              QPlainTextEdit, QProgressBar, QGroupBox, QFormLayout, QTabWidget, QDialog)
+                              QPlainTextEdit, QProgressBar, QGroupBox, QFormLayout, QTabWidget, QDialog, QInputDialog)
 
 from .controller import Controller, client_project
 from .setup_dialog import SetupDialog
 from .projects import import_bundle
 from .plan import PlanView
+from .history import ConflictView, RecoveryView
 
 STATES = {'starting': 'Подключение…', 'synced': 'Синхронизировано',
           'retrying': 'Повтор подключения…', 'conflicts': 'Обнаружены конфликты',
@@ -91,6 +92,15 @@ class MainWindow(QMainWindow):
         self.plan_view = PlanView()
         self.tabs.addTab(self.log, 'Журнал')
         self.tabs.addTab(self.plan_view, 'План изменений')
+        self.conflict_view = ConflictView()
+        self.recovery_view = RecoveryView()
+        self.tabs.addTab(self.conflict_view, 'Конфликты')
+        self.tabs.addTab(self.recovery_view, 'Резервные копии')
+        self.conflict_view.refresh.clicked.connect(lambda: self.start_action('conflicts'))
+        self.conflict_view.resolve_requested.connect(self.resolve_selected)
+        self.recovery_view.refresh.clicked.connect(lambda: self.start_action('recovery-list'))
+        self.recovery_view.verify.clicked.connect(lambda: self.start_action('recovery-verify'))
+        self.recovery_view.export.clicked.connect(self.export_selected)
         layout.addWidget(self.tabs, 1)
         self.controller.busy_changed.connect(self.update_controls)
         self.controller.event.connect(self.on_event)
@@ -154,6 +164,8 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(0)
         self.log.clear()
         self.plan_view.clear()
+        self.conflict_view.clear()
+        self.recovery_view.clear()
         self.append('Проект открыт. Синхронизация автоматически не запускается.')
         self.update_controls()
         return True
@@ -166,17 +178,65 @@ class MainWindow(QMainWindow):
         for button in self.actions.values():
             button.setEnabled(self.config is not None and not busy)
         self.stop_button.setEnabled(busy and not self.stopping)
+        self.conflict_view.set_available(self.config is not None and not busy)
+        self.recovery_view.set_available(self.config is not None and not busy)
 
-    def start_action(self, action):
+    def start_action(self, action, **parameters):
         if not self.config or self.controller.busy:
             return
         self.action, self.failed, self.stopping = action, False, False
-        if action in {'start', 'once', 'plan'}:
+        if action in {'start', 'once', 'plan', 'resolve'}:
             self.plan_view.invalidate()
+        if action in {'start', 'once', 'resolve'}:
+            self.recovery_view.clear()
         self.state_label.setText('Выполняется…')
         self.transfer_label.setText('Подготовка операции')
         self.progress_bar.setRange(0, 0)
-        self.controller.start(self.config, action)
+        self.controller.start(self.config, action, **parameters)
+
+    def resolve_selected(self, choice):
+        if self.controller.busy or not self.config:
+            return
+        entry = self.conflict_view.selected()
+        if not entry or not entry.get('snapshot'):
+            return
+        parameters = {'path': entry['path'], 'choose': choice}
+        if choice == 'both':
+            path = PurePosixPath(entry['path'])
+            suggested = str(path.with_name(path.stem + '.local-copy' + path.suffix))
+            copy, ok = QInputDialog.getText(self, 'Сохранить обе версии',
+                                          'Новый относительный путь локальной копии (родительская папка должна существовать):',
+                                          text=suggested)
+            if not ok or not copy.strip():
+                return
+            parameters['copy_path'] = copy.strip()
+        names = {'local': 'локальная версия', 'remote': 'серверная версия', 'both': 'обе версии'}
+        if self.confirm('Разрешение конфликта',
+                        f"Файл: {entry['path']}\nВыбор: {names[choice]}.\n"
+                        'Будет выполнен проход синхронизации: возможны изменения и других файлов. '
+                        'Если выбранная версия удалена, удаление будет согласовано. '
+                        'При изменении конфликтующих версий ядро откажется применять старый выбор.'):
+            self.start_action('resolve', **parameters)
+
+    def confirm(self, title, text):
+        box = QMessageBox(self)
+        box.setWindowTitle(title)
+        box.setTextFormat(Qt.PlainText)
+        box.setText(text)
+        box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        box.setDefaultButton(QMessageBox.No)
+        return box.exec() == QMessageBox.Yes
+
+    def export_selected(self):
+        if self.controller.busy or not self.config:
+            return
+        entry = self.recovery_view.selected()
+        if not entry or entry.get('error'):
+            return
+        destination, _ = QFileDialog.getSaveFileName(self, 'Экспорт в новый файл вне папки синхронизации',
+                                                    Path(entry.get('path', 'recovered-file')).name)
+        if destination:
+            self.start_action('recovery-export', id=entry['id'], output=destination)
 
     def request_stop(self):
         self.stopping = True
@@ -196,6 +256,7 @@ class MainWindow(QMainWindow):
             self.show_report(report)
 
     def show_report(self, report):
+        self.conflict_view.set_report(report)
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(100)
         summary = (f"Отправлено: {report.get('uploaded', 0)}, получено: {report.get('downloaded', 0)}; "
@@ -223,6 +284,21 @@ class MainWindow(QMainWindow):
             self.state_label.setText('Соединение проверено' if result['ok'] else 'Проверка не пройдена')
             self.append(json.dumps(result, ensure_ascii=False, indent=2))
             self.transfer_label.setText('Проверка подключения завершена; файлы не передавались.')
+        elif self.action == 'conflicts':
+            self.conflict_view.set_report(result)
+            self.tabs.setCurrentWidget(self.conflict_view)
+            self.state_label.setText('Сохранённые конфликты прочитаны')
+            self.transfer_label.setText('Это сохранённый снимок, а не проверка текущего соединения.')
+        elif self.action in {'recovery-list', 'recovery-verify'}:
+            self.recovery_view.set_report(result)
+            self.tabs.setCurrentWidget(self.recovery_view)
+            self.failed = result.get('problems', 0) > 0
+            self.state_label.setText('В резервных копиях обнаружены проблемы' if self.failed else 'Резервные копии прочитаны')
+            self.transfer_label.setText('Операция завершена; файлы не изменены.')
+        elif self.action == 'recovery-export':
+            self.state_label.setText('Копия экспортирована')
+            self.transfer_label.setText(result['output'])
+            self.append('Копия сохранена: ' + result['output'])
         elif self.action == 'plan':
             self.state_label.setText('План готов — файлы не изменены')
             self.transfer_label.setText('Предварительная сверка завершена; файлы не изменены.')

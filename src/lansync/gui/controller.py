@@ -11,6 +11,9 @@ from ..network import make_client, read_token
 from ..project_inspection import inspect_project
 from ..sync import synchronize
 from ..sync_loop import continuous_sync
+from ..status import read_status
+from ..recovery import list_copies, verify_copies, restore_copy
+from ..sync import resolve_conflict
 
 
 def client_project(path):
@@ -26,9 +29,10 @@ class Task(QThread):
     result = Signal(object)
     error = Signal(str)
 
-    def __init__(self, config, action, parent=None):
+    def __init__(self, config, action, parent=None, parameters=None):
         super().__init__(parent)
         self.config, self.action = Path(config), action
+        self.parameters = dict(parameters or {})
         self.stop = Event()
         self._last_progress = 0.0
         self._secret = None
@@ -52,9 +56,31 @@ class Task(QThread):
     def run(self):
         try:
             args = client_project(self.config)
-            if args.dry_run and self.action in {'start', 'once'}:
+            if self.stop.is_set():
+                return
+            if self.action == 'conflicts':
+                report = (read_status(args.state_dir)['last_sync'] or {}) if args.state_dir.exists() else {}
+                self.result.emit(report)
+                return
+            if self.action in {'recovery-list', 'recovery-verify', 'recovery-export'}:
+                if self.action == 'recovery-export':
+                    output = Path(self.parameters['output']).expanduser().absolute()
+                    resolved = output.resolve()
+                    if resolved == args.root or args.root in resolved.parents:
+                        raise ValueError('Экспортируйте копию вне синхронизируемой папки, чтобы она не отправилась на сервер.')
+                    if (args.state_dir / 'sync.lock').exists():
+                        raise ValueError('Есть sync.lock. Проверьте и остановите работающий клиент перед экспортом.')
+                    result = {'output': str(restore_copy(args.state_dir, self.parameters['id'], output))}
+                elif self.action == 'recovery-list':
+                    result = {'entries': list_copies(args.state_dir) if args.state_dir.exists() else []}
+                else:
+                    result = (verify_copies(args.state_dir) if args.state_dir.exists() else
+                              {'entries': [], 'total': 0, 'verified': 0, 'problems': 0})
+                self.result.emit(result)
+                return
+            if args.dry_run and self.action in {'start', 'once', 'resolve'}:
                 raise ValueError('В конфигурации включён dry_run: доступен только план изменений.')
-            if args.log_file and self.action in {'start', 'once'}:
+            if args.log_file and self.action in {'start', 'once', 'resolve'}:
                 raise ValueError('GUI пока не поддерживает log_file. Используйте CLI или отдельную конфигурацию без log_file.')
             self._secret = read_token(args.token_file)
             if self.stop.is_set():
@@ -78,6 +104,10 @@ class Task(QThread):
                                     on_progress=self.report_progress,
                                     local_events=args.local_events,
                                     event_debounce=args.event_debounce)
+                elif self.action == 'resolve':
+                    self.result.emit(resolve_conflict(connection, args.root, args.state_dir,
+                                                       self.parameters['path'], self.parameters['choose'],
+                                                       copy_path=self.parameters.get('copy_path')))
                 else:
                     self.result.emit(synchronize(connection, args.root, args.state_dir,
                                                  dry_run=self.action == 'plan',
@@ -104,12 +134,13 @@ class Controller(QObject):
     def busy(self):
         return self.task is not None
 
-    def start(self, config, action):
+    def start(self, config, action, **parameters):
         if self.busy:
             raise RuntimeError('Операция уже выполняется. Дождитесь её завершения.')
-        if action not in {'start', 'once', 'plan', 'doctor'}:
+        if action not in {'start', 'once', 'plan', 'doctor', 'conflicts', 'resolve',
+                          'recovery-list', 'recovery-verify', 'recovery-export'}:
             raise ValueError('Неизвестная операция')
-        task = Task(config, action, self)
+        task = Task(config, action, self, parameters)
         task.event.connect(self.event.emit)
         task.progress.connect(self.progress.emit)
         task.result.connect(self.result.emit)

@@ -1,0 +1,35 @@
+{
+  "result": "passed",
+  "checks": [
+    "resolve local",
+    "resolve remote",
+    "resolve both",
+    "stale conflict refused without overwrite",
+    "recovery list",
+    "recovery verify",
+    "export SHA-256 verified"
+  ],
+  "expected_errors": [
+    "Conflict changed since detection; run sync and review again"
+  ],
+  "version": "0.2.0.dev3",
+  "date": "2026-11-15",
+  "client": "Windows 11 / PySide6 offscreen",
+  "server": "CachyOS / Linux",
+  "unit_tests": {
+    "linux": {
+      "passed": 146,
+      "skipped": 0
+    },
+    "windows": {
+      "passed": 138,
+      "skipped": 8
+    }
+  },
+  "gui_setup_tests": 19,
+  "limitations": [
+    "Manual Linux desktop testing not performed",
+    "Standalone executable not built",
+    "GUI exports recovery copies; no automatic state repair"
+  ]
+}
