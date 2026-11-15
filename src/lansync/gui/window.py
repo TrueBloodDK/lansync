@@ -3,12 +3,15 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import QSettings, QTimer
+from PySide6.QtCore import QSettings, QTimer, Qt
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                               QLabel, QPushButton, QFileDialog, QMessageBox,
-                              QPlainTextEdit, QProgressBar, QGroupBox, QFormLayout)
+                              QPlainTextEdit, QProgressBar, QGroupBox, QFormLayout, QTabWidget, QDialog)
 
 from .controller import Controller, client_project
+from .setup_dialog import SetupDialog
+from .projects import import_bundle
+from .plan import PlanView
 
 STATES = {'starting': 'Подключение…', 'synced': 'Синхронизировано',
           'retrying': 'Повтор подключения…', 'conflicts': 'Обнаружены конфликты',
@@ -40,13 +43,21 @@ class MainWindow(QMainWindow):
         self.server_label = QLabel('—')
         self.folder_label = QLabel('—')
         for label in (self.project_label, self.server_label, self.folder_label):
+            label.setTextFormat(Qt.PlainText)
             label.setWordWrap(True)
         form.addRow('Конфигурация:', self.project_label)
         form.addRow('Сервер:', self.server_label)
         form.addRow('Локальная папка:', self.folder_label)
         self.open_button = QPushButton('Открыть проект…')
         self.open_button.clicked.connect(self.choose_project)
-        form.addRow(self.open_button)
+        self.new_button = QPushButton('Новый проект…')
+        self.new_button.clicked.connect(self.new_project)
+        self.import_button = QPushButton('Импорт реквизитов…')
+        self.import_button.clicked.connect(self.import_credentials)
+        project_buttons = QHBoxLayout()
+        for button in (self.new_button, self.open_button, self.import_button):
+            project_buttons.addWidget(button)
+        form.addRow(project_buttons)
         layout.addWidget(project_box)
         buttons = QHBoxLayout()
         self.actions = {}
@@ -64,6 +75,7 @@ class MainWindow(QMainWindow):
         self.state_label.setStyleSheet('font-size: 18px; font-weight: 600;')
         self.last_label = QLabel('Успешных проходов в этой сессии ещё нет')
         self.transfer_label = QLabel('Ожидание операции')
+        self.transfer_label.setTextFormat(Qt.PlainText)
         self.transfer_label.setWordWrap(True)
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
@@ -75,7 +87,11 @@ class MainWindow(QMainWindow):
         self.log.setReadOnly(True)
         self.log.setMaximumBlockCount(800)
         self.log.setPlaceholderText('Здесь появятся результаты проверок и операций.')
-        layout.addWidget(self.log, 1)
+        self.tabs = QTabWidget()
+        self.plan_view = PlanView()
+        self.tabs.addTab(self.log, 'Журнал')
+        self.tabs.addTab(self.plan_view, 'План изменений')
+        layout.addWidget(self.tabs, 1)
         self.controller.busy_changed.connect(self.update_controls)
         self.controller.event.connect(self.on_event)
         self.controller.progress.connect(self.on_progress)
@@ -94,6 +110,28 @@ class MainWindow(QMainWindow):
         path, _ = QFileDialog.getOpenFileName(self, 'Открыть клиентский проект', '', 'TOML (*.toml)')
         if path:
             self.open_project(path)
+
+    def new_project(self):
+        if self.controller.busy:
+            return
+        dialog = SetupDialog(self)
+        if dialog.exec() == QDialog.Accepted:
+            self.open_project(dialog.config)
+        dialog.deleteLater()
+
+    def import_credentials(self):
+        if self.controller.busy or not self.config:
+            return
+        source = QFileDialog.getExistingDirectory(self, 'Комплект клиента: ca.pem и token.txt')
+        if not source:
+            return
+        try:
+            import_bundle(self.config, source)
+        except (OSError, ValueError) as exc:
+            self.on_error(str(exc))
+            return
+        self.append('Клиентские реквизиты импортированы. Проверьте соединение перед запуском.')
+        self.plan_view.invalidate()
 
     def open_project(self, path):
         if self.controller.busy:
@@ -115,6 +153,7 @@ class MainWindow(QMainWindow):
         self.transfer_label.setText('Ожидание операции')
         self.progress_bar.setValue(0)
         self.log.clear()
+        self.plan_view.clear()
         self.append('Проект открыт. Синхронизация автоматически не запускается.')
         self.update_controls()
         return True
@@ -122,6 +161,8 @@ class MainWindow(QMainWindow):
     def update_controls(self, *_):
         busy = self.controller.busy
         self.open_button.setEnabled(not busy)
+        self.new_button.setEnabled(not busy)
+        self.import_button.setEnabled(self.config is not None and not busy)
         for button in self.actions.values():
             button.setEnabled(self.config is not None and not busy)
         self.stop_button.setEnabled(busy and not self.stopping)
@@ -130,6 +171,8 @@ class MainWindow(QMainWindow):
         if not self.config or self.controller.busy:
             return
         self.action, self.failed, self.stopping = action, False, False
+        if action in {'start', 'once', 'plan'}:
+            self.plan_view.invalidate()
         self.state_label.setText('Выполняется…')
         self.transfer_label.setText('Подготовка операции')
         self.progress_bar.setRange(0, 0)
@@ -173,13 +216,19 @@ class MainWindow(QMainWindow):
         self.transfer_label.setText(f"{event['path']} — {event['bytes']} / {total} байт")
 
     def on_result(self, result):
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(100)
         if self.action == 'doctor':
             self.failed = not result['ok']
             self.state_label.setText('Соединение проверено' if result['ok'] else 'Проверка не пройдена')
             self.append(json.dumps(result, ensure_ascii=False, indent=2))
+            self.transfer_label.setText('Проверка подключения завершена; файлы не передавались.')
         elif self.action == 'plan':
             self.state_label.setText('План готов — файлы не изменены')
-            self.append(json.dumps(result, ensure_ascii=False, indent=2))
+            self.transfer_label.setText('Предварительная сверка завершена; файлы не изменены.')
+            self.plan_view.set_report(result)
+            self.tabs.setCurrentWidget(self.plan_view)
+            self.append(f"План: {len(result.get('planned', []))} действий, {len(result.get('conflicts', []))} конфликтов.")
         else:
             self.state_label.setText('Обнаружены конфликты' if result['conflicts'] else 'Проход завершён')
             self.last_label.setText('Последний завершённый проход: ' + datetime.now().isoformat(timespec='seconds'))
@@ -189,6 +238,7 @@ class MainWindow(QMainWindow):
         self.failed = True
         self.state_label.setText('Ошибка')
         self.append(message)
+        self.tabs.setCurrentWidget(self.log)
 
     def on_finished(self):
         self.progress_bar.setRange(0, 100)
