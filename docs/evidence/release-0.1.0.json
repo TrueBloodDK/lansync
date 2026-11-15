@@ -1,0 +1,235 @@
+{
+  "version": "0.1.0",
+  "source_commit": "68ff27d53ad7f631366768742bdc0dcd9ecfb717",
+  "result": "passed",
+  "unit_tests": {
+    "linux": {
+      "passed": 127,
+      "skipped": 0
+    },
+    "windows": {
+      "passed": 119,
+      "skipped": 8
+    }
+  },
+  "linux_installation": {
+    "installation_smoke_test": "passed",
+    "artifact_mode": "built",
+    "python": "3.14.8 (main, Oct 13 2026, 10:33:10) [GCC 16.2.1 20260810]",
+    "platform": "Linux-7.3.1-1-cachyos-x86_64-with-glibc2.44",
+    "artifacts_sha256": {
+      "lansync-0.1.0.tar.gz": "f0abbe424c78660b10fedc3a31cc77bced70e64c1149750a864cf97a9a577a39",
+      "lansync-0.1.0-py3-none-any.whl": "753f09f7face3e49029b182ca70061614be40df5f0a190c0cc1f7f76add1bb84"
+    },
+    "acceptance": [
+      {
+        "scenario": "project initialization and client credential export",
+        "result": "passed"
+      },
+      {
+        "scenario": "verified HTTPS and authorized manifest",
+        "result": "passed"
+      },
+      {
+        "scenario": "dry-run leaves client files and state untouched",
+        "result": "passed"
+      },
+      {
+        "scenario": "download Unicode and empty objects",
+        "result": "passed"
+      },
+      {
+        "scenario": "binary upload and server update",
+        "result": "passed"
+      },
+      {
+        "scenario": "deletions in both directions",
+        "result": "passed"
+      },
+      {
+        "scenario": "conflict status and explicit local resolution",
+        "result": "passed"
+      },
+      {
+        "scenario": "keep both conflict versions and synchronize preserved copy",
+        "result": "passed"
+      },
+      {
+        "scenario": "recovery integrity, export and overwrite rejection",
+        "result": "passed"
+      },
+      {
+        "scenario": "final tree hashes match",
+        "result": "passed"
+      },
+      {
+        "scenario": "continuous upload and download",
+        "result": "passed"
+      },
+      {
+        "scenario": "server restart and automatic client reconnect",
+        "result": "passed"
+      },
+      {
+        "scenario": "SIGTERM cleanup and client restart with persistent state",
+        "result": "passed"
+      }
+    ],
+    "installed_dependencies": [
+      "annotated-doc==0.0.6",
+      "annotated-types==0.8.0",
+      "anyio==4.16.0",
+      "certifi==2026.10.23",
+      "cffi==2.1.1",
+      "click==8.5.1",
+      "cryptography==50.0.2",
+      "fastapi==0.163.1",
+      "h11==0.16.0",
+      "httpcore==1.0.9",
+      "httpx==0.28.1",
+      "idna==3.20",
+      "lansync @ file:///home/test1/lansync-release-0.1.0-68ff27d/lansync-0.1.0-py3-none-any.whl#sha256=753f09f7face3e49029b182ca70061614be40df5f0a190c0cc1f7f76add1bb84",
+      "opentelemetry-api==1.45.2",
+      "pycparser==3.12",
+      "pydantic==2.14.3",
+      "pydantic_core==2.50.4",
+      "starlette==1.10.0",
+      "trustme==1.2.1",
+      "typing-inspection==0.4.5",
+      "typing_extensions==4.16.0",
+      "uvicorn==0.54.0",
+      "watchdog==7.1.0"
+    ]
+  },
+  "windows_installation": {
+    "installation_smoke_test": "passed",
+    "artifact_mode": "supplied",
+    "python": "3.12.14 (main, Aug 25 2026, 14:01:42) [MSC v.1944 64 bit (AMD64)]",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "artifacts_sha256": {
+      "lansync-0.1.0-py3-none-any.whl": "753f09f7face3e49029b182ca70061614be40df5f0a190c0cc1f7f76add1bb84",
+      "lansync-0.1.0.tar.gz": "f0abbe424c78660b10fedc3a31cc77bced70e64c1149750a864cf97a9a577a39"
+    },
+    "acceptance": {
+      "status": "skipped",
+      "reason": "Server acceptance runs on Linux; client installation smoke tests passed"
+    },
+    "installed_dependencies": [
+      "annotated-doc==0.0.6",
+      "annotated-types==0.8.0",
+      "anyio==4.16.0",
+      "certifi==2026.10.23",
+      "cffi==2.1.1",
+      "click==8.5.1",
+      "cryptography==50.0.2",
+      "fastapi==0.163.1",
+      "h11==0.16.0",
+      "httpcore==1.0.9",
+      "httpx==0.28.1",
+      "idna==3.20",
+      "lansync @ file:///C:/Users/dkara/Documents/Codex/2026-09-26/x20/outputs/lansync-0.1.0-windows-check/lansync-0.1.0-py3-none-any.whl#sha256=753f09f7face3e49029b182ca70061614be40df5f0a190c0cc1f7f76add1bb84",
+      "opentelemetry-api==1.45.2",
+      "pycparser==3.12",
+      "pydantic==2.14.3",
+      "pydantic_core==2.50.4",
+      "starlette==1.10.0",
+      "trustme==1.2.1",
+      "typing-inspection==0.4.5",
+      "typing_extensions==4.16.0",
+      "uvicorn==0.54.0",
+      "watchdog==7.1.0"
+    ]
+  },
+  "linux_network": {
+    "created_utc": "2026-11-15T11:15:00.479647+00:00",
+    "platform": "Linux-7.3.1-1-cachyos-x86_64-with-glibc2.44",
+    "python": "3.14.8",
+    "lansync_version": "0.1.0",
+    "result": "passed",
+    "mode": "run-client",
+    "method": "Deterministic generated files; sync time includes scans, TLS, hashing and disk I/O. No raw network throughput claim.",
+    "server_url": "https://192.168.0.108:8877",
+    "fixture_id": "2d2b739ae8ed465c826b3a07d14965bc",
+    "passes": [
+      {
+        "direction": "download",
+        "files": 2,
+        "bytes": 335544320,
+        "seconds": 6.083503014000598,
+        "effective_mib_per_second": 52.60127253385931,
+        "transfers": [
+          {
+            "path": "download-000.bin",
+            "direction": "download",
+            "bytes": 67108864,
+            "seconds": 1.1572337739999057
+          },
+          {
+            "path": "download-001.bin",
+            "direction": "download",
+            "bytes": 268435456,
+            "seconds": 4.664116943000408
+          }
+        ]
+      },
+      {
+        "direction": "upload",
+        "files": 2,
+        "bytes": 335544320,
+        "seconds": 3.3584311109989358,
+        "effective_mib_per_second": 95.28258565494852,
+        "transfers": [
+          {
+            "path": "upload-000.bin",
+            "direction": "upload",
+            "bytes": 67108864,
+            "seconds": 0.6121046129992465
+          },
+          {
+            "path": "upload-001.bin",
+            "direction": "upload",
+            "bytes": 268435456,
+            "seconds": 2.052187461998983
+          }
+        ]
+      }
+    ],
+    "final_hashes_match": true
+  },
+  "windows_network": [
+    {
+      "scenario": "TLS authorization and doctor",
+      "result": "PASS"
+    },
+    {
+      "scenario": "Linux to Windows Unicode and empty objects",
+      "result": "PASS"
+    },
+    {
+      "scenario": "Windows to Linux 4MiB binary hashes",
+      "result": "PASS"
+    },
+    {
+      "scenario": "Updates in both directions",
+      "result": "PASS"
+    },
+    {
+      "scenario": "Dry-run and deletions in both directions",
+      "result": "PASS"
+    },
+    {
+      "scenario": "Conflict resolution across operating systems",
+      "result": "PASS"
+    },
+    {
+      "scenario": "Windows recovery integrity",
+      "result": "PASS"
+    },
+    {
+      "scenario": "Linux recovery integrity",
+      "result": "PASS"
+    }
+  ],
+  "windows_logon_trigger": "not tested; manually starting scheduler task passed in earlier test",
+  "github_actions": "not checked in this release verification"
+}
