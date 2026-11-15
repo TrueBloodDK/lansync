@@ -1,0 +1,244 @@
+{
+  "created_utc": "2026-11-15T06:04:32.959785+00:00",
+  "platform": "Linux-7.3.1-1-cachyos-x86_64-with-glibc2.44",
+  "python": "3.14.8",
+  "result": "passed",
+  "stage": "complete",
+  "parameters": {
+    "duration": 7200.0,
+    "files": 2000,
+    "large_mib": 64
+  },
+  "method": "Linux loopback HTTPS; sequential edits; full scans, polling and hashing included in latency. RSS sampled every 0.5s, not exact peak. No network speed or leak guarantee.",
+  "cli_version": "LANSync 0.1.0",
+  "initial_tree_seconds": 86.300253768,
+  "large_transfers": [
+    {
+      "direction": "download",
+      "bytes": 67108864,
+      "convergence_seconds": 4.754456441000002,
+      "effective_mib_per_second": 13.461055074160889
+    },
+    {
+      "direction": "upload",
+      "bytes": 67108864,
+      "convergence_seconds": 2.527007750999985,
+      "effective_mib_per_second": 25.326396396953662
+    }
+  ],
+  "observed_change_seconds": 7190.844212417,
+  "change_phase_seconds": 7201.925270207,
+  "recovery": {
+    "server": {
+      "total": 1484,
+      "verified": 1484,
+      "problems": 0
+    },
+    "client": {
+      "total": 1485,
+      "verified": 1485,
+      "problems": 0
+    }
+  },
+  "final_trees_match": true,
+  "operation_summary": {
+    "count": 3317,
+    "median_seconds": 2.224077465000846,
+    "max_seconds": 3.62076287400032,
+    "deletions": 332
+  },
+  "sampled_peak_rss_bytes": {
+    "server": 86130688,
+    "client": 86499328
+  },
+  "total_seconds": 7298.532274106,
+  "observed_operations": 3317,
+  "operation_types": {
+    "download/write": 1493,
+    "upload/write": 1492,
+    "download/delete": 166,
+    "upload/delete": 166
+  },
+  "memory_windows": [
+    {
+      "from_minute": 0,
+      "to_minute": 10,
+      "samples": 1195,
+      "server": {
+        "median_mib": 79.68,
+        "max_mib": 81.949
+      },
+      "client": {
+        "median_mib": 78.023,
+        "max_mib": 80.051
+      }
+    },
+    {
+      "from_minute": 10,
+      "to_minute": 20,
+      "samples": 1191,
+      "server": {
+        "median_mib": 81.789,
+        "max_mib": 82.062
+      },
+      "client": {
+        "median_mib": 78.688,
+        "max_mib": 80.621
+      }
+    },
+    {
+      "from_minute": 20,
+      "to_minute": 30,
+      "samples": 1193,
+      "server": {
+        "median_mib": 81.836,
+        "max_mib": 82.043
+      },
+      "client": {
+        "median_mib": 78.84,
+        "max_mib": 80.734
+      }
+    },
+    {
+      "from_minute": 30,
+      "to_minute": 40,
+      "samples": 1192,
+      "server": {
+        "median_mib": 81.836,
+        "max_mib": 82.129
+      },
+      "client": {
+        "median_mib": 78.887,
+        "max_mib": 82.387
+      }
+    },
+    {
+      "from_minute": 40,
+      "to_minute": 50,
+      "samples": 1194,
+      "server": {
+        "median_mib": 81.844,
+        "max_mib": 82.047
+      },
+      "client": {
+        "median_mib": 80.551,
+        "max_mib": 82.422
+      }
+    },
+    {
+      "from_minute": 50,
+      "to_minute": 60,
+      "samples": 1194,
+      "server": {
+        "median_mib": 81.844,
+        "max_mib": 82.141
+      },
+      "client": {
+        "median_mib": 80.566,
+        "max_mib": 82.434
+      }
+    },
+    {
+      "from_minute": 60,
+      "to_minute": 70,
+      "samples": 1192,
+      "server": {
+        "median_mib": 81.844,
+        "max_mib": 82.074
+      },
+      "client": {
+        "median_mib": 80.574,
+        "max_mib": 82.441
+      }
+    },
+    {
+      "from_minute": 70,
+      "to_minute": 80,
+      "samples": 1191,
+      "server": {
+        "median_mib": 81.809,
+        "max_mib": 82.051
+      },
+      "client": {
+        "median_mib": 80.586,
+        "max_mib": 82.453
+      }
+    },
+    {
+      "from_minute": 80,
+      "to_minute": 90,
+      "samples": 1194,
+      "server": {
+        "median_mib": 81.844,
+        "max_mib": 82.113
+      },
+      "client": {
+        "median_mib": 80.594,
+        "max_mib": 82.461
+      }
+    },
+    {
+      "from_minute": 90,
+      "to_minute": 100,
+      "samples": 1192,
+      "server": {
+        "median_mib": 81.848,
+        "max_mib": 82.043
+      },
+      "client": {
+        "median_mib": 80.598,
+        "max_mib": 82.469
+      }
+    },
+    {
+      "from_minute": 100,
+      "to_minute": 110,
+      "samples": 1192,
+      "server": {
+        "median_mib": 81.848,
+        "max_mib": 82.105
+      },
+      "client": {
+        "median_mib": 80.602,
+        "max_mib": 82.469
+      }
+    },
+    {
+      "from_minute": 110,
+      "to_minute": 120,
+      "samples": 1194,
+      "server": {
+        "median_mib": 81.848,
+        "max_mib": 82.059
+      },
+      "client": {
+        "median_mib": 80.613,
+        "max_mib": 82.492
+      }
+    },
+    {
+      "from_minute": 120,
+      "to_minute": 130,
+      "samples": 194,
+      "server": {
+        "median_mib": 81.859,
+        "max_mib": 82.008
+      },
+      "client": {
+        "median_mib": 80.625,
+        "max_mib": 82.492
+      }
+    }
+  ],
+  "source_commit": "e8f7eaf",
+  "source_archive_sha256": "e8fd376302ca22c07c917ad46c9b1640de7c53564725cfc08783c232f7b92ffc",
+  "raw_report_sha256": "a4e800ae81f3ef13ff5ed9671c1f98cf4cee5dc324bd11562bb6929ce66904c3",
+  "raw_report_location": "outputs/resilience-20261115/long-final.json (workspace outside repository)",
+  "resource_notes": {
+    "fd_samples": "server/client 8/7 near 11 minutes, 10/8 during transfer near 21 minutes, 8/7 near 60 minutes; no final pre-exit sample",
+    "client_log_bytes": 1336387,
+    "server_log_bytes": 349,
+    "systemd_unit_peak_mib": 461.5,
+    "unit_peak_scope": "whole test cgroup including harness and child processes; not comparable to individual sampled RSS"
+  }
+}
