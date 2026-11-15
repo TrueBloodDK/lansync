@@ -118,6 +118,18 @@ python -m pip install build
 python scripts/release_check.py --output ./release-new
 ```
 
+Для проверки того же набора пакетов на другой ОС, без повторной сборки:
+
+```sh
+python scripts/release_check.py --artifacts ./release-new --output ./release-verified-new
+```
+
+В исходном каталоге должны находиться ровно один LANSync wheel и один sdist.
+Скрипт копирует их в новый output, устанавливает wheel в чистое окружение и
+сохраняет SHA-256. Так можно сопоставить проверки одного wheel на Linux и Windows.
+На Linux дополнительно выполняются HTTPS-сценарии; на Windows проверяется установка
+клиента. Сетевой обмен с Linux-сервером проверяется отдельно.
+
 Создаются wheel и sdist, затем отдельное чистое venv. Wheel устанавливается
 с зависимостями, выполняется pip check, запуск CLI, init, проверка TOML и scan.
 Все smoke-команды выполняются вне репозитория без PYTHONPATH. Требуется интернет

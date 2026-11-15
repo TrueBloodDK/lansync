@@ -20,11 +20,20 @@ def run(args, **kwargs):
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--output',type=Path,required=True,help='New directory for release artifacts')
+    parser.add_argument('--artifacts',type=Path,help='Verify an existing wheel/sdist pair instead of rebuilding')
     args=parser.parse_args()
     output=args.output.expanduser().resolve()
     output.mkdir(parents=True,exist_ok=False)
     root=Path(__file__).resolve().parents[1]
-    run([sys.executable,'-m','build','--outdir',output,root])
+    if args.artifacts:
+        source=args.artifacts.expanduser().resolve(strict=True)
+        supplied=list(source.glob('lansync-*.whl')) + list(source.glob('lansync-*.tar.gz'))
+        if len([p for p in supplied if p.suffix=='.whl'])!=1 or len([p for p in supplied if p.name.endswith('.tar.gz')])!=1:
+            raise ValueError('Expected exactly one LANSync wheel and one sdist in --artifacts')
+        for artifact in supplied:
+            shutil.copyfile(artifact,output/artifact.name)
+    else:
+        run([sys.executable,'-m','build','--outdir',output,root])
     wheels=list(output.glob('*.whl'))
     if len(wheels)!=1: raise RuntimeError('Expected one wheel')
     with tempfile.TemporaryDirectory(prefix='lansync-install-') as tmp:
@@ -55,7 +64,7 @@ def main():
             raise
         dependencies = subprocess.check_output([str(python), '-m', 'pip', 'freeze'], cwd=base, env=env, text=True)
     artifacts = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in output.iterdir() if p.suffix in {'.whl', '.gz'}}
-    report = {'installation_smoke_test': 'passed', 'python': sys.version, 'platform': platform.platform(), 'artifacts_sha256': artifacts, 'acceptance': scenarios, 'installed_dependencies': dependencies.splitlines()}
+    report = {'installation_smoke_test': 'passed', 'artifact_mode': 'supplied' if args.artifacts else 'built', 'python': sys.version, 'platform': platform.platform(), 'artifacts_sha256': artifacts, 'acceptance': scenarios, 'installed_dependencies': dependencies.splitlines()}
     (output/'verification.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
     print('Wheel installation smoke test passed:',output)
 
