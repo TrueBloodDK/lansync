@@ -1,0 +1,99 @@
+{
+  "version": "0.2.0.dev5",
+  "date": "2026-11-16",
+  "tests": {
+    "windows": {
+      "total": 168,
+      "passed": 159,
+      "posix_skipped": 9
+    },
+    "linux": {
+      "total": 168,
+      "passed": 168
+    }
+  },
+  "vm_repository_head_before_testing": "d291795",
+  "candidate_testing": "isolated source snapshot and native frozen binaries",
+  "packages": {
+    "windows": {
+      "archive": "LANSync-0.2.0.dev5-win32.zip",
+      "sha256": "c79c6a1bec2d0daabdf2343817c6773d8d6d118e1bdf14a82df21381be425b2b",
+      "bytes": 60931804,
+      "smoke": {
+        "result": "passed",
+        "version": "0.2.0.dev5",
+        "frozen": true,
+        "platform": "Windows-11-10.0.26200-SP0",
+        "mode": "offline-recovery",
+        "errors": []
+      },
+      "extracted_package": {
+        "result": "passed",
+        "version": "0.2.0.dev5",
+        "frozen": true,
+        "platform": "Windows-11-10.0.26200-SP0",
+        "mode": "offline-recovery",
+        "errors": []
+      }
+    },
+    "linux": {
+      "archive": "LANSync-0.2.0.dev5-linux.tar.gz",
+      "sha256": "8b78942d8e80b1bc68e45e9c654d5cb1750db06ca2ddb945cd6627a6e4ca4e8b",
+      "bytes": 106917120,
+      "smoke": {
+        "result": "passed",
+        "version": "0.2.0.dev5",
+        "frozen": true,
+        "platform": "Linux-7.3.1-1-cachyos-x86_64-with-glibc2.44",
+        "mode": "offline-recovery",
+        "errors": []
+      },
+      "extracted_package": {
+        "result": "passed",
+        "desktop_exec": {
+          "result": "passed",
+          "version": "0.2.0.dev5",
+          "frozen": true,
+          "platform": "Linux-7.3.1-1-cachyos-x86_64-with-glibc2.44",
+          "mode": "offline-recovery",
+          "errors": []
+        },
+        "https": {
+          "result": "passed",
+          "version": "0.2.0.dev5",
+          "frozen": true,
+          "platform": "Linux-7.3.1-1-cachyos-x86_64-with-glibc2.44",
+          "mode": "https-doctor",
+          "errors": []
+        },
+        "checks": [
+          "tar executable mode",
+          "desktop-file-validate",
+          "GIO launch with spaces, unicode and reserved characters",
+          "frozen offline worker",
+          "frozen HTTPS doctor",
+          "no PYTHONPATH, system-only PATH"
+        ]
+      }
+    }
+  },
+  "autostart_tests": [
+    "opt-in defaults and cancellation",
+    "explicit enable/disable",
+    "foreign and stale entries preserved",
+    "atomic Linux entry update and failed replacement",
+    "Windows current-user registry via mock",
+    "startup requires explicit project, no fallback on failure",
+    "ordinary launch never starts synchronization",
+    "Linux .desktop parsing by desktop-file-validate and GIO, special characters in arguments"
+  ],
+  "cleanup": "temporary Linux HTTPS unit stopped; test2-only UFW rule removed",
+  "limits": [
+    "No actual logout/login test on either OS",
+    "No manual native tray interaction",
+    "Windows registry integration tested with mock; real login entry not enabled during tests",
+    "Linux built/tested on CachyOS x86-64 glibc 2.44, compatibility with older systems not claimed",
+    "Frozen HTTPS check is doctor diagnostics, not a file transfer",
+    "GUI rendered with offscreen Qt"
+  ]
+}

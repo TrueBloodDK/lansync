@@ -8,6 +8,7 @@ import shutil
 import ssl
 import subprocess
 import sys
+import tarfile
 import zipfile
 from importlib.metadata import distributions
 
@@ -62,11 +63,16 @@ def main():
                         target = notices / dist.metadata['Name'] / str(file).replace('..', '_')
                         target.parent.mkdir(parents=True, exist_ok=True)
                         shutil.copyfile(source, target)
-        archive = output / f"LANSync-{smoke['version']}-{sys.platform}.zip"
-        with zipfile.ZipFile(archive, 'x', compression=zipfile.ZIP_DEFLATED) as z:
-            for file in sorted(bundle.rglob('*')):
-                if file.is_file():
-                    z.write(file, file.relative_to(bundle.parent))
+        suffix = '.zip' if os.name == 'nt' else '.tar.gz'
+        archive = output / f"LANSync-{smoke['version']}-{sys.platform}{suffix}"
+        if os.name == 'nt':
+            with zipfile.ZipFile(archive, 'x', compression=zipfile.ZIP_DEFLATED) as z:
+                for file in sorted(bundle.rglob('*')):
+                    if file.is_file():
+                        z.write(file, file.relative_to(bundle.parent))
+        else:
+            with tarfile.open(archive, 'w:gz', dereference=False) as tar:
+                tar.add(bundle, arcname='LANSync')
         report.update(result='passed', version=smoke['version'], smoke=smoke,
                       archive=archive.name, archive_sha256=hashlib.sha256(archive.read_bytes()).hexdigest(),
                       executable=str(exe), executable_sha256=hashlib.sha256(exe.read_bytes()).hexdigest())

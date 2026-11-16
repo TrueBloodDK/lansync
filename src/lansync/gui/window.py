@@ -15,6 +15,7 @@ from .plan import PlanView
 from .history import ConflictView, RecoveryView
 from .preferences_dialog import PreferencesDialog
 from .tray import Tray
+from .autostart_dialog import AutostartDialog
 
 STATES = {'starting': 'Подключение…', 'synced': 'Синхронизировано',
           'retrying': 'Повтор подключения…', 'conflicts': 'Обнаружены конфликты',
@@ -59,8 +60,10 @@ class MainWindow(QMainWindow):
         self.import_button.clicked.connect(self.import_credentials)
         self.preferences_button = QPushButton('Настройки…')
         self.preferences_button.clicked.connect(self.edit_preferences)
+        self.autostart_button = QPushButton('Автозапуск…')
+        self.autostart_button.clicked.connect(self.edit_autostart)
         project_buttons = QHBoxLayout()
-        for button in (self.new_button, self.open_button, self.import_button, self.preferences_button):
+        for button in (self.new_button, self.open_button, self.import_button, self.preferences_button, self.autostart_button):
             project_buttons.addWidget(button)
         form.addRow(project_buttons)
         layout.addWidget(project_box)
@@ -146,6 +149,18 @@ class MainWindow(QMainWindow):
             self.append('Настройки сохранены. Резервная копия: ' + str(dialog.backup))
         dialog.deleteLater()
 
+    def edit_autostart(self):
+        if self.controller.busy or not self.config:
+            return
+        try:
+            dialog = AutostartDialog(self.config, self.settings, self)
+        except (OSError, ValueError) as exc:
+            self.on_error(str(exc))
+            return
+        if dialog.exec() == QDialog.Accepted:
+            self.append('Параметры автозапуска сохранены.')
+        dialog.deleteLater()
+
     def update_tray(self):
         self.tray.update(self.controller.busy, self.stopping, self.state_label.text())
         self.tray_button.setEnabled(self.tray.available)
@@ -206,6 +221,7 @@ class MainWindow(QMainWindow):
         self.new_button.setEnabled(not busy)
         self.import_button.setEnabled(self.config is not None and not busy)
         self.preferences_button.setEnabled(self.config is not None and not busy)
+        self.autostart_button.setEnabled(self.config is not None and not busy)
         for button in self.actions.values():
             button.setEnabled(self.config is not None and not busy)
         self.stop_button.setEnabled(busy and not self.stopping)
