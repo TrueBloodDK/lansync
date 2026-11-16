@@ -13,6 +13,8 @@ from .setup_dialog import SetupDialog
 from .projects import import_bundle
 from .plan import PlanView
 from .history import ConflictView, RecoveryView
+from .preferences_dialog import PreferencesDialog
+from .tray import Tray
 
 STATES = {'starting': 'Подключение…', 'synced': 'Синхронизировано',
           'retrying': 'Повтор подключения…', 'conflicts': 'Обнаружены конфликты',
@@ -55,8 +57,10 @@ class MainWindow(QMainWindow):
         self.new_button.clicked.connect(self.new_project)
         self.import_button = QPushButton('Импорт реквизитов…')
         self.import_button.clicked.connect(self.import_credentials)
+        self.preferences_button = QPushButton('Настройки…')
+        self.preferences_button.clicked.connect(self.edit_preferences)
         project_buttons = QHBoxLayout()
-        for button in (self.new_button, self.open_button, self.import_button):
+        for button in (self.new_button, self.open_button, self.import_button, self.preferences_button):
             project_buttons.addWidget(button)
         form.addRow(project_buttons)
         layout.addWidget(project_box)
@@ -102,6 +106,14 @@ class MainWindow(QMainWindow):
         self.recovery_view.verify.clicked.connect(lambda: self.start_action('recovery-verify'))
         self.recovery_view.export.clicked.connect(self.export_selected)
         layout.addWidget(self.tabs, 1)
+        self.tray = Tray(self)
+        self.tray_button = QPushButton('Свернуть в трей')
+        self.tray_button.clicked.connect(self.tray.hide_window)
+        layout.addWidget(self.tray_button)
+        self.tray_timer = QTimer(self)
+        self.tray_timer.setInterval(1000)
+        self.tray_timer.timeout.connect(self.update_tray)
+        self.tray_timer.start()
         self.controller.busy_changed.connect(self.update_controls)
         self.controller.event.connect(self.on_event)
         self.controller.progress.connect(self.on_progress)
@@ -120,6 +132,24 @@ class MainWindow(QMainWindow):
         path, _ = QFileDialog.getOpenFileName(self, 'Открыть клиентский проект', '', 'TOML (*.toml)')
         if path:
             self.open_project(path)
+
+    def edit_preferences(self):
+        if self.controller.busy or not self.config:
+            return
+        try:
+            dialog = PreferencesDialog(self.config, self)
+        except (OSError, ValueError) as exc:
+            self.on_error(str(exc))
+            return
+        if dialog.exec() == QDialog.Accepted:
+            self.plan_view.invalidate()
+            self.append('Настройки сохранены. Резервная копия: ' + str(dialog.backup))
+        dialog.deleteLater()
+
+    def update_tray(self):
+        self.tray.update(self.controller.busy, self.stopping, self.state_label.text())
+        self.tray_button.setEnabled(self.tray.available)
+        self.tray_button.setToolTip('Продолжить работу в фоне' if self.tray.available else 'Системный трей недоступен')
 
     def new_project(self):
         if self.controller.busy:
@@ -175,11 +205,13 @@ class MainWindow(QMainWindow):
         self.open_button.setEnabled(not busy)
         self.new_button.setEnabled(not busy)
         self.import_button.setEnabled(self.config is not None and not busy)
+        self.preferences_button.setEnabled(self.config is not None and not busy)
         for button in self.actions.values():
             button.setEnabled(self.config is not None and not busy)
         self.stop_button.setEnabled(busy and not self.stopping)
         self.conflict_view.set_available(self.config is not None and not busy)
         self.recovery_view.set_available(self.config is not None and not busy)
+        self.update_tray()
 
     def start_action(self, action, **parameters):
         if not self.config or self.controller.busy:
@@ -336,4 +368,5 @@ class MainWindow(QMainWindow):
                 self.request_stop()
             return
         self.settings.sync()
+        self.tray.close()
         event.accept()

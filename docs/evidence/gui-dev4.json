@@ -1,0 +1,59 @@
+{
+  "version": "0.2.0.dev4",
+  "date": "2026-11-16",
+  "windows_tests": {
+    "total": 154,
+    "passed": 146,
+    "skipped_posix": 8
+  },
+  "linux_tests": {
+    "host": "test2",
+    "total": 154,
+    "passed": 154,
+    "mode": "isolated source snapshot, Qt offscreen"
+  },
+  "settings_network": {
+    "result": "passed",
+    "checks": [
+      "GUI settings saved with backup",
+      "HTTPS doctor",
+      "download after settings change",
+      "state lock released"
+    ],
+    "downloaded": 4
+  },
+  "portable_https": {
+    "result": "passed",
+    "version": "0.2.0.dev4",
+    "frozen": true,
+    "platform": "Windows-11-10.0.26200-SP0",
+    "mode": "https-doctor",
+    "errors": []
+  },
+  "archive": "LANSync-0.2.0.dev4-win32.zip",
+  "archive_sha256": "8e5bb61fd979797851bff5758d5a2b96501250616437dede63e194400ac22b25",
+  "archive_bytes": 60922587,
+  "build_dependencies": {
+    "PySide6": "6.12.0",
+    "pyinstaller": "6.22.3",
+    "httpx": "0.28.1",
+    "watchdog": "6.0.0"
+  },
+  "python": "3.12.14",
+  "portable_checks": [
+    "Qt and offline recovery worker",
+    "TLS initialization",
+    "ZIP extracted into a different directory with spaces and Cyrillic",
+    "HTTPS doctor against Linux test1 with no PYTHONPATH and System32-only PATH"
+  ],
+  "visual_checks": [
+    "main window",
+    "preferences dialog"
+  ],
+  "limits": [
+    "Tray tested with mocks; native desktop interaction not manually tested",
+    "Linux standalone binary not built",
+    "Frozen binary HTTPS check is diagnostics only; file transfer after settings changes tested from source",
+    "Unsigned development ZIP, not an installer"
+  ]
+}
