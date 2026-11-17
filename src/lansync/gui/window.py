@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path, PurePosixPath
 
 from PySide6.QtCore import QSettings, QTimer, Qt
-from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                               QLabel, QPushButton, QFileDialog, QMessageBox,
                               QPlainTextEdit, QProgressBar, QGroupBox, QFormLayout, QTabWidget, QDialog, QInputDialog)
 
@@ -374,8 +374,12 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(0, self.close)
 
     def closeEvent(self, event):
-        if self.controller.busy:
+        if self.controller.busy and self.controller.task.isRunning():
             event.ignore()
+            if QApplication.instance().isSavingSession():
+                self.closing = True
+                self.request_stop()
+                return
             if not self.closing and QMessageBox.question(
                     self, 'Завершение работы',
                     'Остановить работу и закрыть окно после завершения текущей операции?',

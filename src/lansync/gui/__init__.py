@@ -44,6 +44,8 @@ def main():
                             'Второй клиент не запущен.')
         return 1
     window = MainWindow()
+    from .shutdown import Shutdown
+    shutdown = Shutdown(app, window)
     def activate_existing():
         window.tray.show()
         window.append('Повторный запуск: показано уже работающее окно. Проект и режим синхронизации не изменены.')
@@ -63,4 +65,5 @@ def main():
     try:
         return app.exec()
     finally:
+        shutdown.restore()
         instance.close()

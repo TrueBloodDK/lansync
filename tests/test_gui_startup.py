@@ -68,6 +68,7 @@ class StartupTests(unittest.TestCase):
              patch('PySide6.QtWidgets.QApplication') as app, \
              patch('lansync.gui.window.MainWindow', return_value=window), \
              patch('lansync.gui.instance.DesktopInstance') as instance, \
+             patch('lansync.gui.shutdown.Shutdown'), \
              patch('PySide6.QtCore.QTimer.singleShot', side_effect=lambda _, callback: callback()):
             instance.return_value.is_primary = True
             app.return_value.exec.return_value = 0

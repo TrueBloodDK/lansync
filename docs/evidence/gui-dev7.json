@@ -1,0 +1,67 @@
+{
+  "version": "0.2.0.dev7",
+  "date": "2026-11-17",
+  "initial_real_login": {
+    "version": "0.2.0.dev6",
+    "user_confirmed_window": true,
+    "probe_file_received": true,
+    "later_process_pid": 4957,
+    "later_session_id": "21",
+    "later_session_started_local": "2026-11-17 19:58:36 +05",
+    "status_last_success_utc": "2026-11-17T14:58:18.601296+00:00",
+    "state_lock_mtime_utc": "2026-11-17T14:58:17.856513+00:00",
+    "outcome": "autostart worked; stale lock prevented sync in later session; saved status belonged to earlier process"
+  },
+  "tests": {
+    "linux": {
+      "total": 177,
+      "passed": 177
+    },
+    "windows": {
+      "total": 177,
+      "passed": 168,
+      "posix_skipped": 9
+    }
+  },
+  "packages": {
+    "windows": {
+      "archive": "LANSync-0.2.0.dev7-win32.zip",
+      "sha256": "3906daff69a4fa1482200b9fc8c8e8bcffdf64d709571ced1295aa780f5a0b55",
+      "bytes": 60939106
+    },
+    "linux": {
+      "archive": "LANSync-0.2.0.dev7-linux.tar.gz",
+      "sha256": "acf45ae22c219ebaba68d042978b890266417b4c0e5d8e462c85cad067941255",
+      "bytes": 106956133
+    }
+  },
+  "signal_check": {
+    "result": "passed",
+    "version": "0.2.0.dev7",
+    "mode": "native xcb frozen binary",
+    "cycles": [
+      {
+        "cycle": 1,
+        "pid": 9898,
+        "exit_code": 0,
+        "status": "stopped",
+        "sync_lock_absent": true
+      },
+      {
+        "cycle": 2,
+        "pid": 9909,
+        "exit_code": 0,
+        "status": "stopped",
+        "sync_lock_absent": true
+      }
+    ]
+  },
+  "real_login_retest": "pending user logout/login with dev7; entry already updated to fresh isolated project",
+  "old_state": "Preserved including sync.lock; no automatic removal",
+  "stand": "Temporary server and test2-only UFW rule on port 8896 retained for pending real-login test",
+  "limits": [
+    "SIGKILL, power failure or forced desktop termination can still leave sync.lock",
+    "Native SIGTERM test does not prove full graphical-session shutdown",
+    "Windows logout not tested"
+  ]
+}
