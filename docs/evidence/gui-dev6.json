@@ -1,0 +1,162 @@
+{
+  "version": "0.2.0.dev6",
+  "date": "2026-11-17",
+  "tests": {
+    "windows": {
+      "total": 174,
+      "passed": 165,
+      "posix_skipped": 9,
+      "note": "Local IPC requires ordinary OS permissions; sandbox denied named pipes. Full run outside sandbox passed."
+    },
+    "linux": {
+      "total": 174,
+      "passed": 174
+    }
+  },
+  "packages": {
+    "windows": {
+      "archive": "LANSync-0.2.0.dev6-win32.zip",
+      "sha256": "947d067cfa89893a0bd167ae329a3f224a96c1bc2dbf8e61ebf88a0536d051f7",
+      "bytes": 60934932
+    },
+    "linux": {
+      "archive": "LANSync-0.2.0.dev6-linux.tar.gz",
+      "sha256": "5b502468f6ea89454b3f61181f7869de2967f275e8250079a4b23fc59bde9347",
+      "bytes": 106955013
+    }
+  },
+  "frozen_sync_phases": {
+    "win1": {
+      "result": "passed",
+      "version": "0.2.0.dev6",
+      "frozen": true,
+      "platform": "Windows-11-10.0.26200-SP0",
+      "mode": "https-sync",
+      "transfer": {
+        "uploaded": 1,
+        "downloaded": 1,
+        "deleted_local": 0,
+        "deleted_remote": 0,
+        "conflicts": []
+      },
+      "errors": []
+    },
+    "win2": {
+      "result": "passed",
+      "version": "0.2.0.dev6",
+      "frozen": true,
+      "platform": "Windows-11-10.0.26200-SP0",
+      "mode": "https-sync",
+      "transfer": {
+        "uploaded": 0,
+        "downloaded": 1,
+        "deleted_local": 1,
+        "deleted_remote": 0,
+        "conflicts": []
+      },
+      "errors": []
+    },
+    "win3": {
+      "result": "passed",
+      "version": "0.2.0.dev6",
+      "frozen": true,
+      "platform": "Windows-11-10.0.26200-SP0",
+      "mode": "https-sync",
+      "transfer": {
+        "uploaded": 1,
+        "downloaded": 0,
+        "deleted_local": 0,
+        "deleted_remote": 0,
+        "conflicts": []
+      },
+      "errors": []
+    },
+    "linux1": {
+      "result": "passed",
+      "version": "0.2.0.dev6",
+      "frozen": true,
+      "platform": "Linux-7.3.1-1-cachyos-x86_64-with-glibc2.44",
+      "mode": "https-sync",
+      "transfer": {
+        "uploaded": 1,
+        "downloaded": 2,
+        "deleted_local": 0,
+        "deleted_remote": 0,
+        "conflicts": []
+      },
+      "errors": []
+    },
+    "linux2": {
+      "result": "passed",
+      "version": "0.2.0.dev6",
+      "frozen": true,
+      "platform": "Linux-7.3.1-1-cachyos-x86_64-with-glibc2.44",
+      "mode": "https-sync",
+      "transfer": {
+        "uploaded": 1,
+        "downloaded": 0,
+        "deleted_local": 0,
+        "deleted_remote": 1,
+        "conflicts": []
+      },
+      "errors": []
+    },
+    "linux3": {
+      "result": "passed",
+      "version": "0.2.0.dev6",
+      "frozen": true,
+      "platform": "Linux-7.3.1-1-cachyos-x86_64-with-glibc2.44",
+      "mode": "https-sync",
+      "transfer": {
+        "uploaded": 0,
+        "downloaded": 1,
+        "deleted_local": 0,
+        "deleted_remote": 0,
+        "conflicts": []
+      },
+      "errors": []
+    }
+  },
+  "content_assertions": [
+    "Windows v1 downloaded by Linux",
+    "Linux v2 downloaded by Windows",
+    "Linux deletion propagated to server and Windows",
+    "Windows update to server.txt downloaded by Linux",
+    "all phase reports conflict-free; sync.lock released after each pass"
+  ],
+  "native_desktop": {
+    "result": "passed",
+    "platform": "xcb",
+    "system_tray_available": true,
+    "checks": [
+      "native X11 Qt window",
+      "download from Linux server",
+      "continuous sync while hidden",
+      "second instance restores window without restarting worker",
+      "tray stop action",
+      "tray open and exit actions",
+      "state lock released"
+    ],
+    "interaction": "programmatic Qt button/menu actions in the real desktop session, not manual mouse interaction"
+  },
+  "native_frozen_instance": {
+    "result": "passed",
+    "checks": [
+      "frozen native xcb launch minimized",
+      "second frozen launch exits successfully",
+      "existing native window becomes mapped",
+      "invalid second config not opened",
+      "second start-sync did not create sync.lock"
+    ],
+    "cleanup": "terminated only the idle test GUI process"
+  },
+  "cleanup": "Temporary server stopped, both source-specific UFW rules removed; test GUI processes closed or terminated while idle.",
+  "limits": [
+    "Real logout/login autostart not tested",
+    "Tray actions were automated Qt actions, not manual mouse clicks",
+    "Native graphical verification on Linux only",
+    "Linux package tested on CachyOS x86-64 glibc 2.44, not older distributions",
+    "Old GUI versions before dev6 do not participate in single-instance protection"
+  ],
+  "computer_use": "Window capture returned mismatched windows; no coordinate-based app interactions were performed. Native verification used the Linux X11 session."
+}

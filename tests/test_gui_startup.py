@@ -67,7 +67,9 @@ class StartupTests(unittest.TestCase):
         with patch('sys.argv', ['lansync-gui', *arguments]), \
              patch('PySide6.QtWidgets.QApplication') as app, \
              patch('lansync.gui.window.MainWindow', return_value=window), \
+             patch('lansync.gui.instance.DesktopInstance') as instance, \
              patch('PySide6.QtCore.QTimer.singleShot', side_effect=lambda _, callback: callback()):
+            instance.return_value.is_primary = True
             app.return_value.exec.return_value = 0
             self.assertEqual(main(), 0)
         return window
@@ -87,3 +89,27 @@ class StartupTests(unittest.TestCase):
         window = self.run_main(True, ['--config', str(self.config)])
         window.start_action.assert_not_called()
         window.tray.hide_window.assert_not_called()
+
+    def test_secondary_launch_does_not_open_config_or_start_worker(self):
+        from lansync.gui import main
+        with patch('sys.argv', ['lansync-gui', '--config', 'missing.toml', '--start-sync']), \
+             patch('PySide6.QtWidgets.QApplication'), \
+             patch('lansync.gui.window.MainWindow') as window, \
+             patch('lansync.gui.instance.DesktopInstance') as instance:
+            instance.return_value.is_primary = False
+            instance.return_value.notify.return_value = True
+            self.assertEqual(main(), 0)
+            window.assert_not_called()
+
+    def test_secondary_with_unresponsive_primary_reports_failure(self):
+        from lansync.gui import main
+        with patch('sys.argv', ['lansync-gui']), \
+             patch('PySide6.QtWidgets.QApplication'), \
+             patch('PySide6.QtWidgets.QMessageBox.warning') as warning, \
+             patch('lansync.gui.window.MainWindow') as window, \
+             patch('lansync.gui.instance.DesktopInstance') as instance:
+            instance.return_value.is_primary = False
+            instance.return_value.notify.return_value = False
+            self.assertEqual(main(), 1)
+            warning.assert_called_once()
+            window.assert_not_called()
