@@ -56,12 +56,41 @@
       }
     ]
   },
-  "real_login_retest": "pending user logout/login with dev7; entry already updated to fresh isolated project",
+  "real_login_retest": "Repeated LXDE logout/login on 2026-11-18 failed: stale sync.lock; superseded by dev8 investigation.",
   "old_state": "Preserved including sync.lock; no automatic removal",
-  "stand": "Temporary server and test2-only UFW rule on port 8896 retained for pending real-login test",
+  "stand": "Server unit lansync-gui-login-20261118 and test2-only UFW port 8896 rule retained for pending user login cycles.",
   "limits": [
     "SIGKILL, power failure or forced desktop termination can still leave sync.lock",
     "Native SIGTERM test does not prove full graphical-session shutdown",
     "Windows logout not tested"
-  ]
+  ],
+  "first_real_dev7_login": {
+    "observed_date": "2026-11-17",
+    "user_confirmed_window": true,
+    "pid": 10214,
+    "process_started_local": "2026-11-17 20:12:56 +05",
+    "status_updated_utc": "2026-11-17T15:13:28.629403+00:00",
+    "status": "synced",
+    "failures": 0,
+    "probe_file_content_verified": true,
+    "project": "lansync-gui-login-20261117-r2"
+  },
+  "continuation_20261118": {
+    "vm_rebooted": true,
+    "user_report": "VM was closed through VirtualBox; exact close mode unspecified. User closed the GUI window today.",
+    "gui_not_running_when_checked": true,
+    "saved_status_was_from_previous_day": true,
+    "new_isolated_project": "lansync-gui-login-20261118",
+    "new_project_sync_passed": true,
+    "downloaded_files": 3,
+    "staged_client_shutdown_passed": true,
+    "next_step": "Deploy dev8 and repeat real graphical logout/login.",
+    "repeat_failure": {
+      "pid": 2079,
+      "process_started_local": "2026-11-18 23:39:51 +05",
+      "saved_last_success_utc": "2026-11-18T18:39:28+00:00",
+      "stale_state_lock": true,
+      "pending_recovery_records": false
+    }
+  }
 }

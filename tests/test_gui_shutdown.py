@@ -1,4 +1,5 @@
 import os
+import json
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from pathlib import Path
 import signal
@@ -31,7 +32,7 @@ class ShutdownTests(unittest.TestCase):
             config = initialize(base/'project', 'client', 'https://localhost:8765')
             (config.parent/'credentials/token.txt').write_text('a'*40)
             window = MainWindow(QSettings(str(base/'ui.ini'), QSettings.IniFormat))
-            shutdown = Shutdown(Mock(), window)
+            shutdown = Shutdown(Mock(), window, base/'diagnostics')
             self.addCleanup(shutdown.restore)
             window.open_project(config)
             entered = Event()
@@ -48,6 +49,8 @@ class ShutdownTests(unittest.TestCase):
                 shutdown.commit(manager)
                 self.assertFalse((config.parent/'state/sync.lock').exists())
                 self.assertFalse(window.controller.task.isRunning())
+                report = json.loads((base/'diagnostics/last-shutdown.json').read_text())
+                self.assertEqual((report['reason'], report['status']), ('session-commit', 'completed'))
                 with patch('lansync.gui.window.QMessageBox.question', side_effect=AssertionError('Logout must not prompt after drain')):
                     self.assertTrue(window.close())
                 self.app.processEvents()
@@ -62,7 +65,9 @@ class ShutdownTests(unittest.TestCase):
         window.controller = Mock()
         window.request_stop = Mock()
         previous = signal.getsignal(signal.SIGTERM)
-        shutdown = Shutdown(Mock(), window)
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        shutdown = Shutdown(Mock(), window, temp.name)
         try:
             shutdown.request(signal.SIGTERM, None)
             self.assertTrue(window.closing)
@@ -75,7 +80,7 @@ class ShutdownTests(unittest.TestCase):
     def test_real_application_supports_session_hooks(self):
         with tempfile.TemporaryDirectory() as temp:
             window = MainWindow(QSettings(str(Path(temp)/'ui.ini'), QSettings.IniFormat))
-            shutdown = Shutdown(self.app, window)
+            shutdown = Shutdown(self.app, window, Path(temp)/'diagnostics')
             try:
                 shutdown.save(Mock())
             finally:
@@ -83,4 +88,42 @@ class ShutdownTests(unittest.TestCase):
                 self.app.commitDataRequest.disconnect(shutdown.commit)
                 self.app.saveStateRequest.disconnect(shutdown.save)
                 self.app.aboutToQuit.disconnect(shutdown.drain)
+                window.close()
+
+    @unittest.skipUnless(hasattr(signal, 'SIGHUP'), 'POSIX SIGHUP')
+    def test_hangup_uses_cooperative_shutdown_and_restores_handler(self):
+        from PySide6.QtWidgets import QWidget
+        with tempfile.TemporaryDirectory() as temp:
+            window = QWidget()
+            window.controller = Mock()
+            window.request_stop = Mock()
+            before = signal.getsignal(signal.SIGHUP)
+            shutdown = Shutdown(Mock(), window, temp)
+            try:
+                handler = signal.getsignal(signal.SIGHUP)
+                handler(signal.SIGHUP, None)
+                window.request_stop.assert_called_once()
+                self.assertTrue(window.closing)
+                report = json.loads((Path(temp)/'last-shutdown.json').read_text())
+                self.assertEqual((report['reason'], report['status']), ('SIGHUP', 'requested'))
+            finally:
+                shutdown.restore()
+                window.close()
+            self.assertEqual(signal.getsignal(signal.SIGHUP), before)
+
+    def test_diagnostic_write_failure_does_not_prevent_stop(self):
+        from PySide6.QtWidgets import QWidget
+        with tempfile.TemporaryDirectory() as temp:
+            destination = Path(temp)/'file'
+            destination.write_text('not a directory')
+            window = QWidget()
+            window.controller = Mock()
+            window.request_stop = Mock()
+            shutdown = Shutdown(Mock(), window, destination)
+            try:
+                shutdown.request(signal.SIGTERM)
+                window.request_stop.assert_called_once()
+                self.assertEqual(destination.read_text(), 'not a directory')
+            finally:
+                shutdown.restore()
                 window.close()

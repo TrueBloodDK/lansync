@@ -1,0 +1,133 @@
+{
+  "version": "0.2.0.dev8",
+  "date": "2026-11-18",
+  "tests": {
+    "linux": {
+      "total": 179,
+      "passed": 179
+    },
+    "windows": {
+      "total": 179,
+      "passed": 169,
+      "posix_skipped": 10
+    }
+  },
+  "packages": {
+    "windows": {
+      "archive": "LANSync-0.2.0.dev8-win32.zip",
+      "sha256": "64ea6d07683edff0181d1660d2f44e60d6a3492528bd09176edecf4705791d24",
+      "bytes": 60941097,
+      "frozen_smoke": {
+        "result": "passed",
+        "version": "0.2.0.dev8",
+        "frozen": true,
+        "platform": "Windows-11-10.0.26200-SP0",
+        "mode": "offline-recovery",
+        "errors": []
+      }
+    },
+    "linux": {
+      "archive": "LANSync-0.2.0.dev8-linux.tar.gz",
+      "sha256": "dbf6ba819c05bd36e7d43b0dbed91f351df3da318d11a5c402b9edf8a79e6b86",
+      "bytes": 106957744,
+      "frozen_smoke": {
+        "result": "passed",
+        "version": "0.2.0.dev8",
+        "frozen": true,
+        "platform": "Linux-7.3.1-1-cachyos-x86_64-with-glibc2.44",
+        "mode": "offline-recovery",
+        "errors": []
+      }
+    }
+  },
+  "dev7_reproduction": {
+    "xserver_stop": "lock released",
+    "sighup": "exit -1, stale sync.lock"
+  },
+  "frozen_native_xcb_checks": [
+    {
+      "mode": "xserver-stop",
+      "exit_code": 1,
+      "sync_lock_exists": false,
+      "status": "stopped",
+      "log": "The X11 connection broke (error 1). Did the X11 server die?\n",
+      "shutdown": {
+        "pid": 4724,
+        "reason": "qt-quit",
+        "status": "completed",
+        "utc": "2026-11-18T18:49:24.376709+00:00"
+      }
+    },
+    {
+      "mode": "sighup",
+      "exit_code": 0,
+      "sync_lock_exists": false,
+      "status": "stopped",
+      "log": "",
+      "shutdown": {
+        "pid": 4737,
+        "reason": "SIGHUP",
+        "status": "completed",
+        "utc": "2026-11-18T18:49:26.030409+00:00"
+      }
+    },
+    {
+      "mode": "sighup-and-xserver-stop",
+      "exit_code": 1,
+      "sync_lock_exists": false,
+      "status": "stopped",
+      "log": "The X11 connection broke (error 1). Did the X11 server die?\n",
+      "shutdown": {
+        "pid": 4750,
+        "reason": "SIGHUP",
+        "status": "completed",
+        "utc": "2026-11-18T18:49:27.212788+00:00"
+      }
+    }
+  ],
+  "deployment": {
+    "result": "passed",
+    "version": "0.2.0.dev8",
+    "manual_test_fixture_recovery": "/home/test2/lansync-gui-login-20261118/before-dev8-recovery",
+    "checks": [
+      "old GUI stopped",
+      "no process referencing project",
+      "only stale state lock failed inspection",
+      "no pending records",
+      "state backup preserved",
+      "original lock archived",
+      "same project and baseline resumed"
+    ],
+    "pid": 4802,
+    "status": {
+      "status": "synced",
+      "failures": 0,
+      "last_success_utc": "2026-11-18T18:50:10.798706+00:00",
+      "updated_utc": "2026-11-18T18:50:10.798729+00:00",
+      "report": {
+        "uploaded": 0,
+        "downloaded": 0,
+        "deleted_local": 0,
+        "deleted_remote": 0,
+        "conflicts": [],
+        "uploaded_bytes": 0,
+        "downloaded_bytes": 0,
+        "operations": [],
+        "conflict_versions": {},
+        "completed_utc": "2026-11-18T18:50:10.789104+00:00",
+        "duration_seconds": 0.055826,
+        "operation": "sync"
+      },
+      "error": null,
+      "retry_in_seconds": null
+    },
+    "next_step": "real user logout/login of dev8; inspect last-shutdown.json"
+  },
+  "real_session_retest": "Pending user logout/login with dev8 running",
+  "limits": [
+    "Actual signal at the failing dev7 LXDE logout was not recorded.",
+    "SIGKILL and power loss still require reviewed recovery; locks are never removed automatically.",
+    "Windows logout has not been tested."
+  ],
+  "stand": "Test1 server and test2-only UFW rule for port 8896 retained for pending real session test."
+}
