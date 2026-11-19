@@ -2,6 +2,9 @@
 
 
 def main():
+    # PyInstaller worker processes must branch before constructing QApplication.
+    from multiprocessing import freeze_support
+    freeze_support()
     import argparse
     import sys
     parser = argparse.ArgumentParser(description='LANSync desktop client')

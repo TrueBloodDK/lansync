@@ -28,6 +28,11 @@ class GuiTests(unittest.TestCase):
         cls.app = QApplication.instance() or QApplication([])
 
     def setUp(self):
+        # These tests inject core responses; process lifetime has separate tests.
+        from lansync.gui.controller import Task
+        inline = patch('lansync.gui.controller.ProcessTask.run', Task.run)
+        inline.start()
+        self.addCleanup(inline.stop)
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.base = Path(self.temp.name)

@@ -1,0 +1,205 @@
+{
+  "version": "0.2.0.dev9",
+  "date": "2026-11-20",
+  "tests": {
+    "linux": {
+      "passed": 181
+    },
+    "windows": {
+      "passed": 171,
+      "posix_skipped": 10
+    }
+  },
+  "packages": {
+    "windows": {
+      "archive": "LANSync-0.2.0.dev9-win32.zip",
+      "sha256": "5fdcd8f0574d6122e4ca8b555411969bd84909f62fdd25bcca4f8be09f74eb32",
+      "bytes": 60942344,
+      "smoke": {
+        "result": "passed",
+        "version": "0.2.0.dev9",
+        "frozen": true,
+        "platform": "Windows-11-10.0.26200-SP0",
+        "mode": "offline-recovery",
+        "errors": []
+      }
+    },
+    "linux": {
+      "archive": "LANSync-0.2.0.dev9-linux.tar.gz",
+      "sha256": "91c86181c86cd892a8d0c3050478e21906dab4f42cc9a3947bd1302396b0d15c",
+      "bytes": 106932329,
+      "smoke": {
+        "result": "passed",
+        "version": "0.2.0.dev9",
+        "frozen": true,
+        "platform": "Linux-7.3.1-1-cachyos-x86_64-with-glibc2.44",
+        "mode": "offline-recovery",
+        "errors": []
+      }
+    }
+  },
+  "regression": "Real GUI process killed on Windows and Linux; worker releases sync.lock and records stopped. Pipe EOF and explicit stop tested with restart of the same project.",
+  "frozen_native_checks": [
+    {
+      "mode": "xserver-stop",
+      "exit_code": 1,
+      "sync_lock_exists": false,
+      "status": "stopped",
+      "log": "The X11 connection broke (error 1). Did the X11 server die?\nThis plugin does not support propagateSizeHints()\n",
+      "same_project_restart": {
+        "result": "passed",
+        "version": "0.2.0.dev9",
+        "frozen": true,
+        "platform": "Linux-7.3.1-1-cachyos-x86_64-with-glibc2.44",
+        "mode": "https-sync",
+        "transfer": {
+          "uploaded": 0,
+          "downloaded": 0,
+          "deleted_local": 0,
+          "deleted_remote": 0,
+          "conflicts": []
+        },
+        "errors": []
+      },
+      "shutdown": {
+        "pid": 4483,
+        "reason": "qt-quit",
+        "status": "completed",
+        "utc": "2026-11-19T19:21:52.597435+00:00"
+      }
+    },
+    {
+      "mode": "sighup",
+      "exit_code": 0,
+      "sync_lock_exists": false,
+      "status": "stopped",
+      "log": "This plugin does not support propagateSizeHints()\n",
+      "same_project_restart": {
+        "result": "passed",
+        "version": "0.2.0.dev9",
+        "frozen": true,
+        "platform": "Linux-7.3.1-1-cachyos-x86_64-with-glibc2.44",
+        "mode": "https-sync",
+        "transfer": {
+          "uploaded": 0,
+          "downloaded": 0,
+          "deleted_local": 0,
+          "deleted_remote": 0,
+          "conflicts": []
+        },
+        "errors": []
+      },
+      "shutdown": {
+        "pid": 4511,
+        "reason": "SIGHUP",
+        "status": "completed",
+        "utc": "2026-11-19T19:21:56.268360+00:00"
+      }
+    },
+    {
+      "mode": "sighup-and-xserver-stop",
+      "exit_code": 1,
+      "sync_lock_exists": false,
+      "status": "stopped",
+      "log": "The X11 connection broke (error 1). Did the X11 server die?\nThis plugin does not support propagateSizeHints()\n",
+      "same_project_restart": {
+        "result": "passed",
+        "version": "0.2.0.dev9",
+        "frozen": true,
+        "platform": "Linux-7.3.1-1-cachyos-x86_64-with-glibc2.44",
+        "mode": "https-sync",
+        "transfer": {
+          "uploaded": 0,
+          "downloaded": 0,
+          "deleted_local": 0,
+          "deleted_remote": 0,
+          "conflicts": []
+        },
+        "errors": []
+      },
+      "shutdown": {
+        "pid": 4538,
+        "reason": "SIGHUP",
+        "status": "completed",
+        "utc": "2026-11-19T19:21:59.730979+00:00"
+      }
+    },
+    {
+      "mode": "gui-kill",
+      "exit_code": -9,
+      "sync_lock_exists": false,
+      "status": "stopped",
+      "log": "This plugin does not support propagateSizeHints()\n",
+      "same_project_restart": {
+        "result": "passed",
+        "version": "0.2.0.dev9",
+        "frozen": true,
+        "platform": "Linux-7.3.1-1-cachyos-x86_64-with-glibc2.44",
+        "mode": "https-sync",
+        "transfer": {
+          "uploaded": 0,
+          "downloaded": 0,
+          "deleted_local": 0,
+          "deleted_remote": 0,
+          "conflicts": []
+        },
+        "errors": []
+      },
+      "shutdown": null
+    }
+  ],
+  "deployment": {
+    "result": "passed",
+    "version": "0.2.0.dev9",
+    "manual_test_fixture_recovery": "/home/test2/lansync-gui-login-20261118/before-dev9-recovery",
+    "checks": [
+      "old GUI stopped",
+      "no process referencing project",
+      "only stale state lock failed inspection",
+      "no pending records",
+      "state backup preserved",
+      "original lock archived",
+      "same project and baseline resumed"
+    ],
+    "pid": 4630,
+    "status": {
+      "status": "synced",
+      "failures": 0,
+      "last_success_utc": "2026-11-19T19:22:32.233118+00:00",
+      "updated_utc": "2026-11-19T19:22:32.233129+00:00",
+      "report": {
+        "uploaded": 0,
+        "downloaded": 0,
+        "deleted_local": 0,
+        "deleted_remote": 0,
+        "conflicts": [],
+        "uploaded_bytes": 0,
+        "downloaded_bytes": 0,
+        "operations": [],
+        "conflict_versions": {},
+        "completed_utc": "2026-11-19T19:22:32.224358+00:00",
+        "duration_seconds": 0.042937,
+        "operation": "sync"
+      },
+      "error": null,
+      "retry_in_seconds": null
+    },
+    "next_step": "real user logout/login of dev9; inspect last-shutdown.json"
+  },
+  "previous_failure": {
+    "lock_created_local": "2026-11-18 23:50:10 +05",
+    "last_success_utc": "2026-11-18T18:54:14.813778+00:00",
+    "gui_log": "Fatal XIO on display :0",
+    "later_shutdown_pid": 804,
+    "error_gui_pid": 1434,
+    "test_server": "inactive at start; restarted as lansync-gui-login-20261120.service"
+  },
+  "test_harness_note": "First native run completed three scenarios; fourth failed during Xvfb display-fd reset. Repeated all four with -noreset and the display fd kept open; all passed.",
+  "real_session_retest": "Pending user logout/login with dev9; automated Xvfb and GUI kill tests do not replace full LXDE session acceptance.",
+  "limits": [
+    "Power loss and killing the worker itself can leave recovery records and locks.",
+    "A quick new launch may see a lock while the old worker completes its operation.",
+    "The temporary test server unit does not survive a VM reboot."
+  ],
+  "stand": "Test server and test2-only UFW rule on port 8896 retained for user logout/login."
+}

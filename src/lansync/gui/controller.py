@@ -140,7 +140,7 @@ class Controller(QObject):
         if action not in {'start', 'once', 'plan', 'doctor', 'conflicts', 'resolve',
                           'recovery-list', 'recovery-verify', 'recovery-export'}:
             raise ValueError('Неизвестная операция')
-        task = Task(config, action, self, parameters)
+        task = ProcessTask(config, action, self, parameters)
         task.event.connect(self.event.emit)
         task.progress.connect(self.progress.emit)
         task.result.connect(self.result.emit)
@@ -161,3 +161,52 @@ class Controller(QObject):
         task.deleteLater()
         self.busy_changed.emit(False)
         self.finished.emit()
+
+
+class ProcessTask(Task):
+    """Relay a headless worker's messages without tying its lifetime to X11."""
+
+    def run(self):
+        from multiprocessing import get_context
+        from .worker import run_worker
+        context = get_context('spawn')
+        parent, child = context.Pipe()
+        process = context.Process(target=run_worker,
+                                  args=(child, str(self.config), self.action, self.parameters))
+        started = False
+        try:
+            if self.stop.is_set():
+                return
+            process.start()
+            started = True
+            child.close()
+            stopping = False
+            while True:
+                if self.stop.is_set() and not stopping:
+                    try:
+                        parent.send('stop')
+                    except (BrokenPipeError, EOFError, OSError):
+                        pass
+                    stopping = True
+                try:
+                    if parent.poll(.1):
+                        kind, value = parent.recv()
+                        if kind not in {'event', 'progress', 'result', 'error'}:
+                            raise ValueError('Некорректное сообщение рабочего процесса')
+                        getattr(self, kind).emit(value)
+                    elif not process.is_alive():
+                        break
+                except (EOFError, BrokenPipeError):
+                    break
+            process.join()
+            if process.exitcode:
+                self.error.emit('Рабочий процесс завершился аварийно. Проверьте состояние проекта перед повторным запуском.')
+        except Exception as exc:
+            self.error.emit(str(exc))
+        finally:
+            child.close()
+            # EOF also requests cooperative stop if the GUI vanishes abruptly.
+            parent.close()
+            if started:
+                process.join()
+                process.close()

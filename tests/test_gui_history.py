@@ -97,8 +97,10 @@ class HistoryGuiTests(unittest.TestCase):
         self.assertFalse(list(self.base.glob('.lansync-restore-*')))
 
     def test_resolve_routes_choice_and_copy_path_to_core(self):
+        from lansync.gui.controller import Task
         (self.config.parent / 'credentials/token.txt').write_text('a' * 40)
-        with patch('lansync.gui.controller.inspect_project', return_value={'checks': []}), \
+        with patch('lansync.gui.controller.ProcessTask.run', Task.run), \
+             patch('lansync.gui.controller.inspect_project', return_value={'checks': []}), \
              patch('lansync.gui.controller.make_client', return_value=nullcontext('client')), \
              patch('lansync.gui.controller.resolve_conflict', return_value={'conflicts': []}) as resolve:
             self.run_action('resolve', path='notes.txt', choose='both', copy_path='notes.local.txt')

@@ -27,6 +27,10 @@ class ShutdownTests(unittest.TestCase):
         cls.app = QApplication.instance() or QApplication([])
 
     def test_session_commit_waits_for_worker_and_releases_real_state_lock(self):
+        from lansync.gui.controller import Task
+        inline = patch('lansync.gui.controller.ProcessTask.run', Task.run)
+        inline.start()
+        self.addCleanup(inline.stop)
         with tempfile.TemporaryDirectory() as temp:
             base = Path(temp)
             config = initialize(base/'project', 'client', 'https://localhost:8765')

@@ -123,7 +123,7 @@
     },
     "next_step": "real user logout/login of dev8; inspect last-shutdown.json"
   },
-  "real_session_retest": "Pending user logout/login with dev8 running",
+  "real_session_retest": "2026-11-20: user reported error again. The state lock dated from 2026-11-18; fatal XIO was present in that launch log. A completed shutdown record belonged to a later PID. Test server also inactive. See gui-dev9.json.",
   "limits": [
     "Actual signal at the failing dev7 LXDE logout was not recorded.",
     "SIGKILL and power loss still require reviewed recovery; locks are never removed automatically.",
