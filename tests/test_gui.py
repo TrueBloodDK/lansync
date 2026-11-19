@@ -153,3 +153,30 @@ class GuiTests(unittest.TestCase):
         window.request_stop()
         window.on_progress(event)
         self.assertTrue(window.state_label.text().startswith('Остановка:'))
+
+    def test_error_advice_and_reconnect_clear_stale_warning(self):
+        window = MainWindow(QSettings(str(self.base / 'ui.ini'), QSettings.IniFormat))
+        self.addCleanup(window.deleteLater)
+        window.on_error('sync.lock')
+        self.assertIn('блокиров', window.problem_label.text())
+        self.assertFalse(window.problem_label.isHidden())
+        window.on_event({'status': 'retrying', 'error': 'connection_failed'})
+        self.assertIn('брандмауэр', window.problem_label.text())
+        window.on_event({'status': 'synced'})
+        self.assertTrue(window.problem_label.isHidden())
+        window.action = 'doctor'
+        window.on_result({'ok': False, 'checks': [{'ok': False, 'reason': 'authorization_failed'}]})
+        self.assertIn('токен', window.problem_label.text())
+
+    def test_journal_export_rejects_shared_root_without_changing_sync_status(self):
+        window = MainWindow(QSettings(str(self.base / 'ui.ini'), QSettings.IniFormat))
+        self.addCleanup(window.deleteLater)
+        window.open_project(self.config)
+        window.state_label.setText('Синхронизировано')
+        target = self.config.parent/'shared/log.txt'
+        with patch('lansync.gui.window.QFileDialog.getSaveFileName', return_value=(str(target), '')), \
+             patch('lansync.gui.window.QMessageBox.warning') as warning:
+            window.export_journal()
+        warning.assert_called_once()
+        self.assertFalse(target.exists())
+        self.assertEqual(window.state_label.text(), 'Синхронизировано')

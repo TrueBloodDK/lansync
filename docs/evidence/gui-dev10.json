@@ -1,0 +1,157 @@
+{
+  "version": "0.2.0.dev10",
+  "date": "2026-11-20",
+  "tests": {
+    "linux": {
+      "passed": 187
+    },
+    "windows": {
+      "passed": 177,
+      "posix_skipped": 10
+    }
+  },
+  "packages": {
+    "windows": {
+      "archive": "LANSync-0.2.0.dev10-win32.zip",
+      "sha256": "a363d237c1776b4ad450c9b0f7ff4984b2dfd0acacf86a783e154c1f9eb57274",
+      "bytes": 60953746,
+      "smoke": {
+        "result": "passed",
+        "version": "0.2.0.dev10",
+        "frozen": true,
+        "platform": "Windows-11-10.0.26200-SP0",
+        "mode": "offline-recovery",
+        "errors": []
+      }
+    },
+    "linux": {
+      "archive": "LANSync-0.2.0.dev10-linux.tar.gz",
+      "sha256": "d5d12dc8e25b5817a08451347357b757f4ad5e40f1e14901fe6eb53854daf1e3",
+      "bytes": 106965043,
+      "smoke": {
+        "result": "passed",
+        "version": "0.2.0.dev10",
+        "frozen": true,
+        "platform": "Linux-7.3.1-1-cachyos-x86_64-with-glibc2.44",
+        "mode": "offline-recovery",
+        "errors": []
+      }
+    }
+  },
+  "native_windows_smoke": {
+    "result": "passed",
+    "version": "0.2.0.dev10",
+    "frozen": true,
+    "platform": "Windows-11-10.0.26200-SP0",
+    "mode": "offline-recovery",
+    "errors": []
+  },
+  "visual_checks": {
+    "result": "passed",
+    "mode": "native xcb Qt widget checks",
+    "checks": [
+      "lock advice visible",
+      "connection advice visible",
+      "export button saves UTF-8",
+      "token redacted",
+      "successful reconnect clears advice"
+    ]
+  },
+  "reconnect": {
+    "result": "passed",
+    "version": "0.2.0.dev10",
+    "initial_files": 3,
+    "offline": {
+      "status": "retrying",
+      "failures": 7,
+      "last_success_utc": "2026-11-19T19:35:43.969789+00:00",
+      "updated_utc": "2026-11-19T19:36:04.160813+00:00",
+      "report": null,
+      "error": "[Errno 111] Connection refused",
+      "retry_in_seconds": 4
+    },
+    "reconnected": {
+      "status": "synced",
+      "failures": 0,
+      "last_success_utc": "2026-11-19T19:37:04.908336+00:00",
+      "updated_utc": "2026-11-19T19:37:04.908349+00:00",
+      "report": {
+        "uploaded": 0,
+        "downloaded": 0,
+        "deleted_local": 0,
+        "deleted_remote": 0,
+        "conflicts": [],
+        "uploaded_bytes": 0,
+        "downloaded_bytes": 0,
+        "operations": [],
+        "conflict_versions": {},
+        "completed_utc": "2026-11-19T19:37:04.900840+00:00",
+        "duration_seconds": 0.034242,
+        "operation": "sync"
+      },
+      "error": null,
+      "retry_in_seconds": null
+    },
+    "stop_released_lock": true,
+    "journal_exported": true,
+    "journal_records": 10,
+    "mode": "frozen offscreen GUI against real Linux HTTPS server"
+  },
+  "deployment": {
+    "result": "passed",
+    "version": "0.2.0.dev10",
+    "old_pid": 4960,
+    "new_pid": 7464,
+    "status": {
+      "status": "synced",
+      "failures": 0,
+      "last_success_utc": "2026-11-19T19:37:07.738498+00:00",
+      "updated_utc": "2026-11-19T19:37:07.738515+00:00",
+      "report": {
+        "uploaded": 0,
+        "downloaded": 0,
+        "deleted_local": 0,
+        "deleted_remote": 0,
+        "conflicts": [],
+        "uploaded_bytes": 0,
+        "downloaded_bytes": 0,
+        "operations": [],
+        "conflict_versions": {},
+        "completed_utc": "2026-11-19T19:37:07.728744+00:00",
+        "duration_seconds": 0.045078,
+        "operation": "sync"
+      },
+      "error": null,
+      "retry_in_seconds": null
+    },
+    "manual_state_changes": false,
+    "autostart_updated": true
+  },
+  "server_service": {
+    "unit": "lansync-gui-acceptance.service",
+    "host": "test1",
+    "address": "192.168.0.108:8896",
+    "user": "test1",
+    "enabled": true,
+    "active": true,
+    "main_pid_after_restart": 1494,
+    "systemd_analyze_verify": "passed",
+    "stop_start_verified": true,
+    "boot_test": "not performed in this run",
+    "previous_transient_unit": "lansync-gui-login-20261120.service stopped"
+  },
+  "checks": [
+    "journal rotation and bounded records",
+    "token and URL userinfo redaction",
+    "disk journal failure remains nonfatal",
+    "UTF-8 export refuses overwrite and shared/state directory",
+    "specific error advice and clearing after reconnect",
+    "Linux native screenshots reviewed",
+    "Windows native screenshot reviewed; offscreen lacks system font rendering"
+  ],
+  "limits": [
+    "This run tested Linux HTTPS download/reconnect, not the entire cross-platform release acceptance suite.",
+    "Actual service boot after VM reboot and Windows login/logout remain pending.",
+    "Journal may include filenames and paths; long identifiers/hashes are also redacted."
+  ]
+}

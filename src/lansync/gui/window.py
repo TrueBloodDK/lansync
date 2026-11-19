@@ -3,7 +3,7 @@ import json
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 
-from PySide6.QtCore import QSettings, QTimer, Qt
+from PySide6.QtCore import QSettings, QTimer, Qt, QStandardPaths
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                               QLabel, QPushButton, QFileDialog, QMessageBox,
                               QPlainTextEdit, QProgressBar, QGroupBox, QFormLayout, QTabWidget, QDialog, QInputDialog)
@@ -16,6 +16,8 @@ from .history import ConflictView, RecoveryView
 from .preferences_dialog import PreferencesDialog
 from .tray import Tray
 from .autostart_dialog import AutostartDialog
+from .journal import Journal, redact
+from .problems import explain
 
 STATES = {'starting': 'Подключение…', 'synced': 'Синхронизировано',
           'retrying': 'Повтор подключения…', 'conflicts': 'Обнаружены конфликты',
@@ -26,6 +28,9 @@ class MainWindow(QMainWindow):
     def __init__(self, settings=None):
         super().__init__()
         self.settings = settings if settings is not None else QSettings('LANSync', 'Desktop')
+        journal_directory = (Path(settings.fileName()).parent / 'gui-journal' if settings is not None else
+                             Path(QStandardPaths.writableLocation(QStandardPaths.AppLocalDataLocation)) / 'journal')
+        self.journal = Journal(journal_directory)
         self.controller = Controller(self)
         self.config = None
         self.stopping = self.closing = self.failed = False
@@ -90,6 +95,11 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.state_label)
         layout.addWidget(self.last_label)
         layout.addWidget(self.transfer_label)
+        self.problem_label = QLabel()
+        self.problem_label.setTextFormat(Qt.PlainText)
+        self.problem_label.setWordWrap(True)
+        self.problem_label.hide()
+        layout.addWidget(self.problem_label)
         layout.addWidget(self.progress_bar)
         self.log = QPlainTextEdit()
         self.log.setReadOnly(True)
@@ -109,6 +119,13 @@ class MainWindow(QMainWindow):
         self.recovery_view.verify.clicked.connect(lambda: self.start_action('recovery-verify'))
         self.recovery_view.export.clicked.connect(self.export_selected)
         layout.addWidget(self.tabs, 1)
+        self.export_log_button = QPushButton('Сохранить журнал…')
+        self.export_log_button.clicked.connect(self.export_journal)
+        layout.addWidget(self.export_log_button)
+        self.journal_label = QLabel()
+        self.journal_label.setTextFormat(Qt.PlainText)
+        self.journal_label.setWordWrap(True)
+        layout.addWidget(self.journal_label)
         self.tray = Tray(self)
         self.tray_button = QPushButton('Свернуть в трей')
         self.tray_button.clicked.connect(self.tray.hide_window)
@@ -124,12 +141,37 @@ class MainWindow(QMainWindow):
         self.controller.error.connect(self.on_error)
         self.controller.finished.connect(self.on_finished)
         self.update_controls()
+        self.append('GUI запущен.')
         last = self.settings.value('last_project', '')
         if last and Path(last).is_file():
             self.open_project(last)
 
     def append(self, text):
+        text = self.journal.append(text)
         self.log.appendPlainText(f'{datetime.now():%H:%M:%S}  {text}')
+        self.journal_label.setText('Журнал не сохраняется: ' + self.journal.error if self.journal.error else
+                                   'Журнал сохраняется локально; экспорт может содержать пути и имена файлов.')
+
+    def export_journal(self):
+        destination, _ = QFileDialog.getSaveFileName(self, 'Сохранить журнал в новый файл',
+                                                    'lansync-journal.txt', 'Текст (*.txt)')
+        if not destination:
+            return
+        try:
+            target = Path(destination).resolve()
+            if self.config:
+                args = client_project(self.config)
+                for protected in (args.root.resolve(), args.state_dir.resolve()):
+                    if target == protected or protected in target.parents:
+                        raise ValueError('Сохраните журнал вне папки синхронизации и каталога состояния.')
+            self.journal.export(target)
+            self.append('Журнал экспортирован: ' + str(target))
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(self, 'Журнал не сохранён', redact(exc))
+
+    def show_problem(self, message):
+        self.problem_label.setText(explain(message))
+        self.problem_label.show()
 
     def choose_project(self):
         path, _ = QFileDialog.getOpenFileName(self, 'Открыть клиентский проект', '', 'TOML (*.toml)')
@@ -203,6 +245,7 @@ class MainWindow(QMainWindow):
         self.folder_label.setText(str(args.root))
         self.settings.setValue('last_project', str(config))
         self.failed = False
+        self.problem_label.hide()
         self.state_label.setText('Не запущено')
         self.last_label.setText('Успешных проходов в этой сессии ещё нет')
         self.transfer_label.setText('Ожидание операции')
@@ -233,6 +276,8 @@ class MainWindow(QMainWindow):
         if not self.config or self.controller.busy:
             return
         self.action, self.failed, self.stopping = action, False, False
+        self.problem_label.hide()
+        self.append('Начало операции: ' + action)
         if action in {'start', 'once', 'plan', 'resolve'}:
             self.plan_view.invalidate()
         if action in {'start', 'once', 'resolve'}:
@@ -293,12 +338,16 @@ class MainWindow(QMainWindow):
         self.update_controls()
 
     def on_event(self, event):
+        self.append('Состояние: ' + STATES.get(event['status'], event['status']))
         if not self.stopping:
             self.state_label.setText(STATES.get(event['status'], event['status']))
         if event.get('last_success_utc'):
             self.last_label.setText('Последний успешный проход (UTC): ' + event['last_success_utc'])
         if event.get('error'):
             self.append(event['error'])
+            self.show_problem(event['error'])
+        elif event['status'] in {'synced', 'stopped', 'conflicts'}:
+            self.problem_label.hide()
         report = event.get('report')
         if report:
             self.show_report(report)
@@ -332,6 +381,9 @@ class MainWindow(QMainWindow):
             self.state_label.setText('Соединение проверено' if result['ok'] else 'Проверка не пройдена')
             self.append(json.dumps(result, ensure_ascii=False, indent=2))
             self.transfer_label.setText('Проверка подключения завершена; файлы не передавались.')
+            if not result['ok']:
+                failed = [item for item in result.get('checks', []) if not item.get('ok')]
+                self.show_problem(' '.join(item.get('reason', item.get('check', '')) for item in failed))
         elif self.action == 'conflicts':
             self.conflict_view.set_report(result)
             self.tabs.setCurrentWidget(self.conflict_view)
@@ -361,10 +413,12 @@ class MainWindow(QMainWindow):
     def on_error(self, message):
         self.failed = True
         self.state_label.setText('Ошибка')
+        self.show_problem(message)
         self.append(message)
         self.tabs.setCurrentWidget(self.log)
 
     def on_finished(self):
+        self.append('Операция завершена' + (' с ошибкой.' if self.failed else '.'))
         self.progress_bar.setRange(0, 100)
         if self.stopping and not self.failed:
             self.state_label.setText('Остановлено')

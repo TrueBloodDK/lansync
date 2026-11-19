@@ -54,6 +54,40 @@ lansync run ./client-project/project.toml --action plan
 lansync run ./client-project/project.toml
 ```
 
+## Linux: постоянная служба сервера
+
+Для сервера, который должен работать до входа пользователя, используйте системную
+службу. [Образец unit-файла](deploy/systemd/lansync-server.service) запускает сервер
+от обычного пользователя, а не root. Сначала проверьте ручной запуск проекта с
+`command = "serve"`. Подставьте в образец имя пользователя и абсолютные пути к
+установленному `lansync` и `project.toml`; выбранный пользователь должен иметь
+доступ к папке файлов, состоянию и серверным реквизитам. Пароль и токен в unit
+не записываются. Не запускайте одновременно вторую службу для того же проекта.
+
+После редактирования сохраните файл как `lansync-server.service` и выполните:
+
+```sh
+systemd-analyze verify ./lansync-server.service
+sudo install -o root -g root -m 0644 ./lansync-server.service /etc/systemd/system/lansync-server.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now lansync-server.service
+systemctl is-enabled lansync-server.service
+systemctl status lansync-server.service
+```
+
+Журнал: `journalctl -u lansync-server.service -f`.
+Штатный перезапуск: `sudo systemctl restart lansync-server.service`.
+Отключение службы и автозапуска: `sudo systemctl disable --now lansync-server.service`.
+После обновления программы проверьте путь ExecStart: удаление использованного
+окружения Python сделает запуск невозможным. TLS и правила брандмауэра настраиваются
+отдельно. `enabled` подтверждает регистрацию автозапуска; реальную загрузку после
+перезагрузки проверяйте отдельно. `TimeoutStopSec=300` — пример: для длительных
+операций увеличьте время, чтобы systemd не оборвала завершение принудительно.
+
+На стенде test1 используется `lansync-gui-acceptance.service`, порт 8896 и прежний
+проект `~/lansync-gui-dev6-server/project.toml`. Служба установлена в системный
+каталог и включена в автозапуск; клиентский адрес и данные не менялись.
+
 ## Linux: пользовательская служба systemd
 
 Если система использует systemd, создайте ~/.config/systemd/user/lansync.service,

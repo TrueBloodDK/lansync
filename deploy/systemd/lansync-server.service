@@ -1,0 +1,22 @@
+[Unit]
+Description=LANSync server
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=120
+StartLimitBurst=3
+
+[Service]
+Type=simple
+# Replace USER and all paths before installing this example.
+User=USER
+WorkingDirectory=/home/USER/server-project
+ExecStart=/home/USER/lansync-env/bin/lansync run /home/USER/server-project/project.toml
+Environment=PYTHONUNBUFFERED=1
+UMask=0077
+NoNewPrivileges=true
+Restart=on-failure
+RestartSec=15
+TimeoutStopSec=300
+
+[Install]
+WantedBy=multi-user.target
