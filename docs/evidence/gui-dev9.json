@@ -195,11 +195,29 @@
     "test_server": "inactive at start; restarted as lansync-gui-login-20261120.service"
   },
   "test_harness_note": "First native run completed three scenarios; fourth failed during Xvfb display-fd reset. Repeated all four with -noreset and the display fd kept open; all passed.",
-  "real_session_retest": "Pending user logout/login with dev9; automated Xvfb and GUI kill tests do not replace full LXDE session acceptance.",
+  "real_session_retest": "Passed one real logout/login cycle on 2026-11-20: previous GUI completed shutdown; autostart opened a new GUI and worker; fresh sync succeeded without manual state changes.",
   "limits": [
     "Power loss and killing the worker itself can leave recovery records and locks.",
     "A quick new launch may see a lock while the old worker completes its operation.",
     "The temporary test server unit does not survive a VM reboot."
   ],
-  "stand": "Test server and test2-only UFW rule on port 8896 retained for user logout/login."
+  "stand": "Test server and test2-only UFW rule on port 8896 retained so the running client remains usable. Temporary server unit does not survive reboot.",
+  "real_login": {
+    "user_confirmed_synced": true,
+    "previous_gui_pid": 4630,
+    "previous_shutdown": {
+      "reason": "qt-quit",
+      "status": "completed",
+      "utc": "2026-11-19T19:25:17.838369+00:00"
+    },
+    "new_gui_pid": 4960,
+    "new_gui_started_local": "2026-11-20 00:25:22 +05",
+    "worker_pid": 5128,
+    "status": "synced",
+    "failures": 0,
+    "status_updated_utc": "2026-11-19T19:25:24.447240+00:00",
+    "autostart_version": "0.2.0.dev9",
+    "manual_lock_removal_during_cycle": false,
+    "scope": "One real LXDE logout/login cycle; no reboot or Windows logout acceptance implied."
+  }
 }
