@@ -377,7 +377,7 @@
       "retry_in_seconds": null
     },
     "registration_verified": true,
-    "real_windows_logout_login": "pending user action"
+    "real_windows_logout_login": "Dev10 failed: worker died during logout, next autostart blocked by stale sync.lock. See gui-dev11.json for fix and pending retest."
   },
   "stand": {
     "ufw_windows": "allow from 192.168.0.104 to tcp 8896",

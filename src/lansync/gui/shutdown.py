@@ -70,7 +70,8 @@ class Shutdown:
             # sync.lock while the main thread waits for the current operation.
             task.wait()
         self.window.settings.sync()
-        self.record('completed')
+        failed = self.window.failed or (task is not None and getattr(task, 'failure', None))
+        self.record('completed_with_errors' if failed else 'completed')
 
     def save(self, manager):
         manager.setRestartHint(QSessionManager.RestartNever)

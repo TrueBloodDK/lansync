@@ -36,6 +36,7 @@ class Task(QThread):
         self.stop = Event()
         self._last_progress = 0.0
         self._secret = None
+        self.failure = None
 
     def safe_text(self, text):
         return str(text).replace(self._secret, '[скрыто]') if self._secret else str(text)
@@ -113,7 +114,8 @@ class Task(QThread):
                                                  dry_run=self.action == 'plan',
                                                  on_progress=self.report_progress))
         except Exception as exc:
-            self.error.emit(self.safe_text(exc))
+            self.failure = self.safe_text(exc)
+            self.error.emit(self.failure)
         finally:
             self._secret = None
 
@@ -193,6 +195,8 @@ class ProcessTask(Task):
                         kind, value = parent.recv()
                         if kind not in {'event', 'progress', 'result', 'error'}:
                             raise ValueError('Некорректное сообщение рабочего процесса')
+                        if kind == 'error':
+                            self.failure = value
                         getattr(self, kind).emit(value)
                     elif not process.is_alive():
                         break
@@ -200,9 +204,11 @@ class ProcessTask(Task):
                     break
             process.join()
             if process.exitcode:
-                self.error.emit('Рабочий процесс завершился аварийно. Проверьте состояние проекта перед повторным запуском.')
+                self.failure = f'Рабочий процесс завершился аварийно (код {process.exitcode}). Проверьте состояние проекта перед повторным запуском.'
+                self.error.emit(self.failure)
         except Exception as exc:
-            self.error.emit(str(exc))
+            self.failure = str(exc)
+            self.error.emit(self.failure)
         finally:
             child.close()
             # EOF also requests cooperative stop if the GUI vanishes abruptly.

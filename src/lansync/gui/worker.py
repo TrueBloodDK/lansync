@@ -5,8 +5,8 @@ from threading import Thread
 
 
 def run_worker(connection, config, action, parameters):
-    # No QApplication or X connection is created here. A desktop's XIO fatal
-    # exit therefore cannot interrupt the operation's finally/recovery code.
+    # Linux workers have no QApplication or X connection. Windows workers
+    # instead need a hidden native window to receive session notifications.
     if os.name == 'posix':
         os.setsid()
     from PySide6.QtCore import Qt
@@ -33,6 +33,10 @@ def run_worker(connection, config, action, parameters):
         getattr(task, kind).connect(lambda value, k=kind: send(k, value), Qt.DirectConnection)
     Thread(target=control, daemon=True).start()
     try:
-        task.run()
+        if os.name == 'nt':
+            from .windows_worker import run_windows_task
+            run_windows_task(task)
+        else:
+            task.run()
     finally:
         connection.close()

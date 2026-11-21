@@ -1,0 +1,149 @@
+{
+  "version": "0.2.0.dev11",
+  "date": "2026-11-21",
+  "tests": {
+    "windows": {
+      "passed": 179,
+      "posix_skipped": 10
+    },
+    "linux": {
+      "passed": 188,
+      "windows_skipped": 1
+    }
+  },
+  "packages": {
+    "windows": {
+      "archive": "LANSync-0.2.0.dev11-win32.zip",
+      "sha256": "ea7af41e39356158aff79f4ec3fc900596b771f6fc9acf04a4f1bb9f3d6ace73",
+      "bytes": 60956496,
+      "smoke": {
+        "result": "passed",
+        "version": "0.2.0.dev11",
+        "frozen": true,
+        "platform": "Windows-11-10.0.26200-SP0",
+        "mode": "offline-recovery",
+        "errors": []
+      }
+    },
+    "linux": {
+      "archive": "LANSync-0.2.0.dev11-linux.tar.gz",
+      "sha256": "e9652fa1ba6a2015a4322451ffdb7958560da005dd219cd156eee03e22a55cce",
+      "bytes": 106979689,
+      "smoke": {
+        "result": "passed",
+        "version": "0.2.0.dev11",
+        "frozen": true,
+        "platform": "Linux-7.3.1-1-cachyos-x86_64-with-glibc2.44",
+        "mode": "offline-recovery",
+        "errors": []
+      }
+    }
+  },
+  "native_frozen_windows": {
+    "result": "passed",
+    "version": "0.2.0.dev11",
+    "cycles": [
+      {
+        "mode": "worker-query",
+        "gui_pid": 1256,
+        "worker_pid": 36964,
+        "worker_window_hidden": true,
+        "query_result": 1,
+        "sync_lock_released": true,
+        "status": "stopped",
+        "gui_exit_code": 0
+      },
+      {
+        "mode": "gui-query",
+        "gui_pid": 10612,
+        "worker_pid": 21348,
+        "worker_window_hidden": true,
+        "query_result": 1,
+        "sync_lock_released": true,
+        "status": "stopped",
+        "gui_exit_code": 0
+      }
+    ],
+    "real_logout": "not performed"
+  },
+  "deployment": {
+    "result": "passed",
+    "version": "0.2.0.dev11",
+    "pid": 7816,
+    "status": {
+      "status": "synced",
+      "failures": 0,
+      "last_success_utc": "2026-11-21T13:54:44.678701+00:00",
+      "updated_utc": "2026-11-21T13:54:44.678701+00:00",
+      "report": {
+        "uploaded": 0,
+        "downloaded": 0,
+        "deleted_local": 0,
+        "deleted_remote": 0,
+        "conflicts": [],
+        "uploaded_bytes": 0,
+        "downloaded_bytes": 0,
+        "operations": [],
+        "conflict_versions": {},
+        "completed_utc": "2026-11-21T13:54:44.674788+00:00",
+        "duration_seconds": 0.046,
+        "operation": "sync"
+      },
+      "error": null,
+      "retry_in_seconds": null
+    },
+    "manual_recovery": {
+      "backup": "C:\\Users\\dkara\\Documents\\Codex\\2026-09-26\\x20\\outputs\\win-login\\before-dev11-recovery",
+      "no_owner_verified": true,
+      "pending_records": 0,
+      "recovery_integrity": {
+        "entries": [
+          {
+            "id": "d0fc923016374d87b85430e9606159eb",
+            "path": "acceptance-20261121/\u0432\u043b\u043e\u0436\u0435\u043d\u043d\u0430\u044f/\u043f\u0443\u0441\u0442\u043e\u0439.txt",
+            "size": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "status": "verified"
+          },
+          {
+            "id": "e4e6128d99ab48bb82d6135c140410e1",
+            "path": "acceptance-20261121/notes.txt",
+            "size": 5,
+            "sha256": "f34848ca92665c342abd5816c9e3eda0e82180671195362bcd0080544a3bc2ac",
+            "status": "verified"
+          }
+        ],
+        "total": 2,
+        "verified": 2,
+        "problems": 0
+      },
+      "original_lock_archived": true
+    },
+    "autostart": "C:\\Users\\dkara\\Documents\\Codex\\2026-09-26\\x20\\outputs\\lansync-gui-dev11-windows\\dist\\LANSync\\LANSync.exe --config C:\\Users\\dkara\\Documents\\Codex\\2026-09-26\\x20\\outputs\\win-login\\project\\project.toml --start-sync",
+    "real_windows_logout_login": "pending user retest"
+  },
+  "dev10_failure": {
+    "old_gui_pid": 18320,
+    "worker_failure_utc": "2026-11-21T13:34:25.156674+00:00",
+    "old_gui_shutdown_record": "session-commit/completed despite worker failure",
+    "next_gui_pid": 1548,
+    "next_gui_error": "state_lock",
+    "next_gui_error_utc": "2026-11-21T13:36:26.790975+00:00",
+    "lock_created_utc": "2026-11-21T13:15:51+00:00"
+  },
+  "harness_note": "First frozen probe sent WM_CLOSE before controller finished and opened its confirmation. The worker had stopped and released state. Probe was corrected to await the finished log and send ENDSESSION after QUERY to GUI; both cycles passed.",
+  "vm_repositories": {
+    "test1": "831fa8e",
+    "test2": "831fa8e"
+  },
+  "stand": {
+    "server": "lansync-gui-acceptance.service active",
+    "linux_gui": "dev10 still running and synced; no Linux GUI replacement needed for Windows fix",
+    "windows_gui": "dev11 running and synced; autostart updated"
+  },
+  "limits": [
+    "Actual Windows logout/login with dev11 remains pending user retest.",
+    "Native messages target only test windows and do not emulate all OS shutdown ordering or forced timeout behavior.",
+    "Power loss or forced termination may still require reviewed recovery; product never deletes stale locks automatically."
+  ]
+}

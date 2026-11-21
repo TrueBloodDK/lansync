@@ -94,6 +94,19 @@ class ShutdownTests(unittest.TestCase):
                 self.app.aboutToQuit.disconnect(shutdown.drain)
                 window.close()
 
+    def test_failed_worker_is_not_reported_as_clean_shutdown(self):
+        with tempfile.TemporaryDirectory() as temp:
+            window = MainWindow(QSettings(str(Path(temp)/'ui.ini'), QSettings.IniFormat))
+            shutdown = Shutdown(Mock(), window, Path(temp)/'diagnostics')
+            try:
+                window.failed = True
+                shutdown.drain()
+                report = json.loads((Path(temp)/'diagnostics/last-shutdown.json').read_text())
+                self.assertEqual(report['status'], 'completed_with_errors')
+            finally:
+                shutdown.restore()
+                window.close()
+
     @unittest.skipUnless(hasattr(signal, 'SIGHUP'), 'POSIX SIGHUP')
     def test_hangup_uses_cooperative_shutdown_and_restores_handler(self):
         from PySide6.QtWidgets import QWidget

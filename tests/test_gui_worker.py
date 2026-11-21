@@ -94,3 +94,54 @@ class WorkerTests(unittest.TestCase):
             if gui.poll() is None:
                 gui.kill()
             gui.wait(timeout=10)
+
+    @unittest.skipUnless(os.name == 'nt', 'Windows session messages')
+    def test_windows_worker_drains_on_native_query_end_session(self):
+        import ctypes
+        from ctypes import wintypes
+        context = multiprocessing.get_context('spawn')
+        parent, child = context.Pipe()
+        worker = context.Process(target=run_worker, args=(child, str(self.config), 'start', {}))
+        worker.start()
+        child.close()
+        try:
+            while True:
+                self.assertTrue(parent.poll(15))
+                kind, value = parent.recv()
+                self.assertNotEqual(kind, 'error', value)
+                if kind == 'event' and value['status'] == 'retrying':
+                    break
+            user = ctypes.WinDLL('user32', use_last_error=True)
+            callback_type = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+            user.EnumWindows.argtypes = [callback_type, wintypes.LPARAM]
+            user.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+            user.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+            handles = []
+            @callback_type
+            def visit(hwnd, _):
+                pid = wintypes.DWORD()
+                user.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+                text = ctypes.create_unicode_buffer(128)
+                user.GetWindowTextW(hwnd, text, 128)
+                if pid.value == worker.pid and text.value == 'LANSync worker session guard':
+                    handles.append(hwnd)
+                return True
+            user.EnumWindows(visit, 0)
+            self.assertEqual(len(handles), 1)
+            user.SendMessageTimeoutW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM,
+                                                 wintypes.LPARAM, wintypes.UINT, wintypes.UINT,
+                                                 ctypes.POINTER(ctypes.c_size_t)]
+            user.SendMessageTimeoutW.restype = ctypes.c_ssize_t
+            result = ctypes.c_size_t()
+            self.assertTrue(user.SendMessageTimeoutW(handles[0], 0x11, 0, 0x80000000, 2, 10000, ctypes.byref(result)))
+            self.assertEqual(result.value, 1)
+            worker.join(10)
+            self.assertEqual(worker.exitcode, 0)
+            self.assertEqual(self.status(), 'stopped')
+            self.assertFalse((self.state/'sync.lock').exists())
+        finally:
+            parent.close()
+            if worker.is_alive():
+                worker.kill()
+            worker.join(10)
+            worker.close()
