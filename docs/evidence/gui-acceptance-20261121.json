@@ -1,0 +1,396 @@
+{
+  "result": "passed",
+  "phases": [
+    {
+      "side": "windows",
+      "phase": "init",
+      "result": "passed"
+    },
+    {
+      "side": "linux",
+      "phase": "init",
+      "result": "passed"
+    },
+    {
+      "side": "windows",
+      "phase": "doctor",
+      "result": "passed",
+      "verification": {
+        "result": "passed",
+        "version": "0.2.0.dev10",
+        "frozen": true,
+        "platform": "Windows-11-10.0.26200-SP0",
+        "mode": "https-doctor",
+        "errors": []
+      }
+    },
+    {
+      "side": "windows",
+      "phase": "plan",
+      "result": "passed",
+      "verification": {
+        "result": "passed",
+        "mode": "source GUI with spawned worker",
+        "action": "plan",
+        "report": {
+          "uploaded": 0,
+          "downloaded": 0,
+          "deleted_local": 0,
+          "deleted_remote": 0,
+          "conflicts": [],
+          "uploaded_bytes": 0,
+          "downloaded_bytes": 0,
+          "operations": [],
+          "dry_run": true,
+          "planned": [
+            {
+              "path": "linux.txt",
+              "operation": "download",
+              "kind": "file",
+              "bytes": 16
+            },
+            {
+              "path": "login-proof.txt",
+              "operation": "download",
+              "kind": "file",
+              "bytes": 41
+            },
+            {
+              "path": "server.txt",
+              "operation": "download",
+              "kind": "file",
+              "bytes": 23
+            }
+          ],
+          "planned_upload_bytes": 0,
+          "planned_download_bytes": 80
+        }
+      }
+    },
+    {
+      "side": "windows",
+      "phase": "windows-create",
+      "result": "passed",
+      "verification": {
+        "result": "passed",
+        "version": "0.2.0.dev10",
+        "frozen": true,
+        "platform": "Windows-11-10.0.26200-SP0",
+        "mode": "https-sync",
+        "transfer": {
+          "uploaded": 5,
+          "downloaded": 3,
+          "deleted_local": 0,
+          "deleted_remote": 0,
+          "conflicts": []
+        },
+        "errors": []
+      }
+    },
+    {
+      "side": "linux",
+      "phase": "linux-receive",
+      "result": "passed",
+      "verification": {
+        "result": "passed",
+        "version": "0.2.0.dev10",
+        "frozen": true,
+        "platform": "Linux-7.3.1-1-cachyos-x86_64-with-glibc2.44",
+        "mode": "https-sync",
+        "transfer": {
+          "uploaded": 0,
+          "downloaded": 8,
+          "deleted_local": 0,
+          "deleted_remote": 0,
+          "conflicts": []
+        },
+        "errors": []
+      }
+    },
+    {
+      "side": "linux",
+      "phase": "linux-edit",
+      "result": "passed",
+      "verification": {
+        "result": "passed",
+        "version": "0.2.0.dev10",
+        "frozen": true,
+        "platform": "Linux-7.3.1-1-cachyos-x86_64-with-glibc2.44",
+        "mode": "https-sync",
+        "transfer": {
+          "uploaded": 2,
+          "downloaded": 0,
+          "deleted_local": 0,
+          "deleted_remote": 1,
+          "conflicts": []
+        },
+        "errors": []
+      }
+    },
+    {
+      "side": "windows",
+      "phase": "windows-receive",
+      "result": "passed",
+      "verification": {
+        "result": "passed",
+        "version": "0.2.0.dev10",
+        "frozen": true,
+        "platform": "Windows-11-10.0.26200-SP0",
+        "mode": "https-sync",
+        "transfer": {
+          "uploaded": 0,
+          "downloaded": 2,
+          "deleted_local": 1,
+          "deleted_remote": 0,
+          "conflicts": []
+        },
+        "errors": []
+      }
+    },
+    {
+      "side": "windows",
+      "phase": "windows-conflict",
+      "result": "passed",
+      "verification": {
+        "result": "passed",
+        "version": "0.2.0.dev10",
+        "frozen": true,
+        "platform": "Windows-11-10.0.26200-SP0",
+        "mode": "https-sync",
+        "transfer": {
+          "uploaded": 1,
+          "downloaded": 0,
+          "deleted_local": 0,
+          "deleted_remote": 0,
+          "conflicts": []
+        },
+        "errors": []
+      }
+    },
+    {
+      "side": "linux",
+      "phase": "linux-conflict",
+      "result": "passed",
+      "verification": {
+        "result": "passed",
+        "version": "0.2.0.dev10",
+        "frozen": true,
+        "platform": "Linux-7.3.1-1-cachyos-x86_64-with-glibc2.44",
+        "mode": "https-sync",
+        "transfer": {
+          "uploaded": 0,
+          "downloaded": 0,
+          "deleted_local": 0,
+          "deleted_remote": 0,
+          "conflicts": [
+            "acceptance-20261121/notes.txt"
+          ]
+        },
+        "errors": []
+      }
+    },
+    {
+      "side": "linux",
+      "phase": "resolve-both",
+      "result": "passed",
+      "verification": {
+        "result": "passed",
+        "mode": "source GUI with spawned worker",
+        "action": "resolve",
+        "report": {
+          "uploaded": 0,
+          "downloaded": 1,
+          "deleted_local": 0,
+          "deleted_remote": 0,
+          "conflicts": [],
+          "uploaded_bytes": 0,
+          "downloaded_bytes": 17,
+          "operations": [
+            {
+              "path": "acceptance-20261121/notes.txt",
+              "operation": "download",
+              "bytes": 17
+            }
+          ],
+          "preserved_copy": "acceptance-20261121/notes.linux.txt",
+          "conflict_versions": {},
+          "completed_utc": "2026-11-21T13:15:05.022322+00:00",
+          "duration_seconds": 0.136156,
+          "operation": "resolve"
+        }
+      }
+    },
+    {
+      "side": "linux",
+      "phase": "linux-resolved",
+      "result": "passed",
+      "verification": {
+        "result": "passed",
+        "version": "0.2.0.dev10",
+        "frozen": true,
+        "platform": "Linux-7.3.1-1-cachyos-x86_64-with-glibc2.44",
+        "mode": "https-sync",
+        "transfer": {
+          "uploaded": 1,
+          "downloaded": 0,
+          "deleted_local": 0,
+          "deleted_remote": 0,
+          "conflicts": []
+        },
+        "errors": []
+      }
+    },
+    {
+      "side": "windows",
+      "phase": "windows-resolved",
+      "result": "passed",
+      "verification": {
+        "result": "passed",
+        "version": "0.2.0.dev10",
+        "frozen": true,
+        "platform": "Windows-11-10.0.26200-SP0",
+        "mode": "https-sync",
+        "transfer": {
+          "uploaded": 0,
+          "downloaded": 1,
+          "deleted_local": 0,
+          "deleted_remote": 0,
+          "conflicts": []
+        },
+        "errors": []
+      }
+    },
+    {
+      "side": "windows",
+      "phase": "recovery",
+      "result": "passed",
+      "verification": {
+        "result": "passed",
+        "mode": "source GUI with spawned worker",
+        "action": "recovery-verify",
+        "report": {
+          "entries": [
+            {
+              "id": "d0fc923016374d87b85430e9606159eb",
+              "path": "acceptance-20261121/\u0432\u043b\u043e\u0436\u0435\u043d\u043d\u0430\u044f/\u043f\u0443\u0441\u0442\u043e\u0439.txt",
+              "size": 0,
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "status": "verified"
+            },
+            {
+              "id": "e4e6128d99ab48bb82d6135c140410e1",
+              "path": "acceptance-20261121/notes.txt",
+              "size": 5,
+              "sha256": "f34848ca92665c342abd5816c9e3eda0e82180671195362bcd0080544a3bc2ac",
+              "status": "verified"
+            }
+          ],
+          "total": 2,
+          "verified": 2,
+          "problems": 0
+        }
+      }
+    },
+    {
+      "side": "linux",
+      "phase": "recovery",
+      "result": "passed",
+      "verification": {
+        "result": "passed",
+        "mode": "source GUI with spawned worker",
+        "action": "recovery-verify",
+        "report": {
+          "entries": [
+            {
+              "id": "d1678a9392ac4a22980e5d4d91f2f7e2",
+              "path": "acceptance-20261121/notes.txt",
+              "size": 15,
+              "sha256": "e1d2c9c22e3d8cd5d4cbf195787bf72a087b20cd7034a8e5b1cee0414404f038",
+              "status": "verified"
+            }
+          ],
+          "total": 1,
+          "verified": 1,
+          "problems": 0
+        }
+      }
+    }
+  ],
+  "date": "2026-11-21",
+  "version": "0.2.0.dev10",
+  "packages": {
+    "windows": {
+      "archive": "LANSync-0.2.0.dev10-win32.zip",
+      "sha256": "a363d237c1776b4ad450c9b0f7ff4984b2dfd0acacf86a783e154c1f9eb57274"
+    },
+    "linux": {
+      "archive": "LANSync-0.2.0.dev10-linux.tar.gz",
+      "sha256": "d5d12dc8e25b5817a08451347357b757f4ad5e40f1e14901fe6eb53854daf1e3"
+    }
+  },
+  "server_boot": {
+    "boot_id": "e72d3293-4d13-417c-a3d7-89478f165739",
+    "boot_local": "2026-11-21 17:32:03 +05",
+    "service_started_local": "2026-11-21 17:32:13 +05",
+    "service": "lansync-gui-acceptance.service",
+    "pid": 500,
+    "enabled": true,
+    "active": true,
+    "https_port": 8896,
+    "agent_rebooted_vm": false
+  },
+  "linux_client_boot": {
+    "boot_id": "65e0d68b-6126-417a-a109-2d8d3cf573ec",
+    "boot_local": "2026-11-21 17:32:02 +05",
+    "gui_started_local": "2026-11-21 17:32:42 +05",
+    "gui_pid": 771,
+    "worker_pid": 1100,
+    "fresh_sync_utc": "2026-11-21T13:10:37.154371+00:00",
+    "status": "synced"
+  },
+  "windows_login_preparation": {
+    "result": "prepared",
+    "version": "0.2.0.dev10",
+    "pid": 18320,
+    "command": "C:\\Users\\dkara\\Documents\\Codex\\2026-09-26\\x20\\outputs\\lansync-gui-dev10-windows\\dist\\LANSync\\LANSync.exe --config C:\\Users\\dkara\\Documents\\Codex\\2026-09-26\\x20\\outputs\\win-login\\project\\project.toml --start-sync",
+    "command_characters": 211,
+    "status": {
+      "status": "synced",
+      "failures": 0,
+      "last_success_utc": "2026-11-21T13:15:51.898178+00:00",
+      "updated_utc": "2026-11-21T13:15:51.898178+00:00",
+      "report": {
+        "uploaded": 0,
+        "downloaded": 0,
+        "deleted_local": 0,
+        "deleted_remote": 0,
+        "conflicts": [],
+        "uploaded_bytes": 0,
+        "downloaded_bytes": 0,
+        "operations": [],
+        "conflict_versions": {},
+        "completed_utc": "2026-11-21T13:15:51.895150+00:00",
+        "duration_seconds": 0.047,
+        "operation": "sync"
+      },
+      "error": null,
+      "retry_in_seconds": null
+    },
+    "registration_verified": true,
+    "real_windows_logout_login": "pending user action"
+  },
+  "stand": {
+    "ufw_windows": "allow from 192.168.0.104 to tcp 8896",
+    "ufw_linux": "allow from 192.168.0.109 to tcp 8896",
+    "old_host_rule": ".102 rule added during initial probe and removed after actual host IP inspection",
+    "server": "persistent service active",
+    "windows": "GUI left running for logout/login test",
+    "test_data": "acceptance-20261121 retained on server and clients for inspection"
+  },
+  "scope": [
+    "Frozen dev10 performed HTTPS doctor, transfers, modification, deletion, conflict detection and post-resolution verification.",
+    "Plan, keep-both resolution and recovery verification used source MainWindow with spawned worker from the same dev10 code; they were not automated in frozen widgets.",
+    "Initial doctor timeout was caused by changed host DHCP address; source GUI resolution harness initially lacked offscreen driver. Both harness issues corrected; original logs retained.",
+    "Real Windows logout/login is pending. No release readiness claim is made for that scenario."
+  ]
+}
