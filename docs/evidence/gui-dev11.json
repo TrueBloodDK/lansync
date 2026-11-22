@@ -145,5 +145,31 @@
     "Actual Windows logout/login with dev11 remains pending user retest.",
     "Native messages target only test windows and do not emulate all OS shutdown ordering or forced timeout behavior.",
     "Power loss or forced termination may still require reviewed recovery; product never deletes stale locks automatically."
-  ]
+  ],
+  "observation_20261122": {
+    "windows_gui_pid": 19416,
+    "windows_worker_pid": 9292,
+    "windows_gui_started_local": "2026-11-22 10:11:45 +05",
+    "first_retry_utc": "2026-11-22T05:12:09.420154+00:00",
+    "errors": [
+      "WinError 10060",
+      "TLS handshake timeout"
+    ],
+    "server_boot_local": "2026-11-22 11:04:29 +05",
+    "server_started_local": "2026-11-22 11:04:40 +05",
+    "windows_reconnected_utc": "2026-11-22T06:04:44.437829+00:00",
+    "windows_success_utc": "2026-11-22T06:05:45.244735+00:00",
+    "linux_success_utc": "2026-11-22T06:06:00.546304+00:00",
+    "both_status": "synced",
+    "windows_address": "192.168.0.104",
+    "ufw_rules_verified": true,
+    "agent_changed_state_or_network": false,
+    "previous_shutdown_record": {
+      "pid": 32900,
+      "reason": "qt-quit",
+      "status": "completed",
+      "utc": "2026-11-21T14:48:00.686987+00:00"
+    },
+    "scope": "Successful dev11 startup and reconnect observed; this does not establish how the previous GUI was closed or prove the complete logout sequence."
+  }
 }
