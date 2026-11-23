@@ -1,0 +1,42 @@
+{
+  "date": "2026-11-24",
+  "source_commit": "ec332ef",
+  "version": "0.2.0.dev11",
+  "linux": {
+    "archive": "LANSync-0.2.0.dev11-linux.tar.gz",
+    "sha256": "e8390f4e69643810fba327694f26e6bd66eccef5757cfe76b20f682b2e17e01c",
+    "frozen_smoke": {
+      "result": "passed",
+      "version": "0.2.0.dev11",
+      "frozen": true,
+      "platform": "Linux-7.3.1-1-cachyos-x86_64-with-glibc2.44",
+      "mode": "offline-recovery",
+      "errors": []
+    },
+    "https_doctor": "passed",
+    "documentation_links_verified": 25
+  },
+  "windows": {
+    "result": "passed",
+    "platform": "win32",
+    "version": "0.2.0.dev11",
+    "smoke": {
+      "result": "passed",
+      "version": "0.2.0.dev11",
+      "frozen": true,
+      "platform": "Windows-11-10.0.26200-SP0",
+      "mode": "offline-recovery",
+      "errors": []
+    },
+    "archive": "LANSync-0.2.0.dev11-win32.zip",
+    "archive_sha256": "30743195b62827a170b0b4b9dfdb4fbe354563fbcea1e220f3ec963e17f656d9",
+    "executable_sha256": "785238847ccc05ea179a94a3c5d7f06a9e3ffbec9eb3a6d6b539d6e94be5a5bc",
+    "documentation_check": {
+      "local_links_verified": 25,
+      "result": "passed",
+      "refreshed_after_ui_acceptance": true,
+      "executable_unchanged_after_smoke": true
+    }
+  },
+  "scope": "Documentation packaging refresh, not final 0.2.0 release. Linux visible UI acceptance remains incomplete; VirtualBox does not forward type_text into guest fields."
+}
