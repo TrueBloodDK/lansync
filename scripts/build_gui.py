@@ -48,11 +48,22 @@ def main():
         smoke = json.loads((output / 'smoke/verification.json').read_text(encoding='utf-8'))
         if smoke['result'] != 'passed' or not smoke['frozen']:
             raise RuntimeError('Frozen GUI smoke check failed')
-        shutil.copyfile(root / 'docs/GUI.md', bundle / 'GUI.md')
+        # Preserve repository-relative documentation links in the portable package.
+        documentation = bundle / 'documentation'
+        documentation.mkdir()
+        for source in root.glob('*.md'):
+            shutil.copyfile(source, documentation / source.name)
+        shutil.copytree(root / 'docs', documentation / 'docs')
+        (bundle / 'GUI.md').write_text(
+            '# LANSync\n\n'
+            '[Первый запуск](documentation/docs/GUI_QUICKSTART.md)\n\n'
+            '[Демонстрация](documentation/docs/GUI_DEMO.md)\n\n'
+            '[Подробная документация](documentation/docs/GUI.md)\n', encoding='utf-8')
         (bundle / 'START.txt').write_text(
             'LANSync desktop client\nExtract the entire directory before launching LANSync.\n'
             'Keep _internal next to the executable. Python installation is not required.\n'
-            'This is a development build; project files belong outside this application directory.\n', encoding='utf-8')
+            'This is a development build; project files belong outside this application directory.\n'
+            'Russian quick start: documentation/docs/GUI_QUICKSTART.md\n', encoding='utf-8')
         # Preserve available upstream notices from the build environment.
         notices = bundle / 'third-party-notices'
         for dist in distributions():

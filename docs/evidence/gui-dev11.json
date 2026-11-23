@@ -100,7 +100,7 @@
         "entries": [
           {
             "id": "d0fc923016374d87b85430e9606159eb",
-            "path": "acceptance-20261121/\u0432\u043b\u043e\u0436\u0435\u043d\u043d\u0430\u044f/\u043f\u0443\u0441\u0442\u043e\u0439.txt",
+            "path": "acceptance-20261121/вложенная/пустой.txt",
             "size": 0,
             "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "status": "verified"
@@ -120,7 +120,7 @@
       "original_lock_archived": true
     },
     "autostart": "C:\\Users\\dkara\\Documents\\Codex\\2026-09-26\\x20\\outputs\\lansync-gui-dev11-windows\\dist\\LANSync\\LANSync.exe --config C:\\Users\\dkara\\Documents\\Codex\\2026-09-26\\x20\\outputs\\win-login\\project\\project.toml --start-sync",
-    "real_windows_logout_login": "pending user retest"
+    "real_windows_logout_login": "user confirmed logout with running dev11; next startup and reconnect observed"
   },
   "dev10_failure": {
     "old_gui_pid": 18320,
@@ -142,9 +142,9 @@
     "windows_gui": "dev11 running and synced; autostart updated"
   },
   "limits": [
-    "Actual Windows logout/login with dev11 remains pending user retest.",
     "Native messages target only test windows and do not emulate all OS shutdown ordering or forced timeout behavior.",
-    "Power loss or forced termination may still require reviewed recovery; product never deletes stale locks automatically."
+    "Power loss or forced termination may still require reviewed recovery; product never deletes stale locks automatically.",
+    "Windows logout was confirmed by the user; the complete prior shutdown sequence was not captured in OS events."
   ],
   "observation_20261122": {
     "windows_gui_pid": 19416,
@@ -170,6 +170,11 @@
       "status": "completed",
       "utc": "2026-11-21T14:48:00.686987+00:00"
     },
-    "scope": "Successful dev11 startup and reconnect observed; this does not establish how the previous GUI was closed or prove the complete logout sequence."
+    "scope": "Successful dev11 startup and reconnect observed; this does not establish how the previous GUI was closed or prove the complete logout sequence.",
+    "user_confirmation": {
+      "date": "2026-11-22",
+      "statement": "User confirms logging out of Windows with LANSync dev11 still running.",
+      "scope": "User-reported logout combined with observed next startup and automatic reconnect. No complete OS event trace of prior shutdown."
+    }
   }
 }
