@@ -62,7 +62,7 @@ def main():
         (bundle / 'START.txt').write_text(
             'LANSync desktop client\nExtract the entire directory before launching LANSync.\n'
             'Keep _internal next to the executable. Python installation is not required.\n'
-            'This is a development build; project files belong outside this application directory.\n'
+            f"Version: {smoke['version']}. Keep project files outside this application directory.\n"
             'Russian quick start: documentation/docs/GUI_QUICKSTART.md\n', encoding='utf-8')
         # Preserve available upstream notices from the build environment.
         notices = bundle / 'third-party-notices'

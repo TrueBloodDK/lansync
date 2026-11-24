@@ -1,0 +1,63 @@
+{
+  "windows": {
+    "result": "passed",
+    "platform": "win32",
+    "version": "0.2.0",
+    "smoke": {
+      "result": "passed",
+      "version": "0.2.0",
+      "frozen": true,
+      "platform": "Windows-11-10.0.26200-SP0",
+      "mode": "offline-recovery",
+      "errors": []
+    },
+    "archive": "LANSync-0.2.0-win32.zip",
+    "archive_sha256": "1b6185c652ec62768337b57e084f471ef17d4bcc6d59102a96454c19b04607ad",
+    "executable_sha256": "977b79a236c7f995ea9ee4edb266362c81015e98963a3dbb3ff6cfd11436ada8",
+    "https_sync": {
+      "result": "passed",
+      "version": "0.2.0",
+      "frozen": true,
+      "platform": "Windows-11-10.0.26200-SP0",
+      "mode": "https-sync",
+      "transfer": {
+        "uploaded": 0,
+        "downloaded": 2,
+        "deleted_local": 0,
+        "deleted_remote": 0,
+        "conflicts": []
+      },
+      "errors": []
+    }
+  },
+  "linux": {
+    "result": "passed",
+    "platform": "linux",
+    "version": "0.2.0",
+    "smoke": {
+      "result": "passed",
+      "version": "0.2.0",
+      "frozen": true,
+      "platform": "Linux-7.3.1-1-cachyos-x86_64-with-glibc2.44",
+      "mode": "offline-recovery",
+      "errors": []
+    },
+    "archive": "LANSync-0.2.0-linux.tar.gz",
+    "archive_sha256": "32a3333c2796935bc6e222c7a6abca5aaa0c0a9acbfe5151947f37f4de55fceb",
+    "executable_sha256": "02625c31bf1205e5e303eb9eae03efdc1711f1acf8d8f05841940de3818a0138",
+    "https_sync": "passed; frozen 0.2.0; no conflicts or errors"
+  },
+  "tests": {
+    "windows": {
+      "passed": 179,
+      "skipped": 10,
+      "subtests": 73
+    },
+    "linux": {
+      "passed": 188,
+      "skipped": 1,
+      "subtests": 76
+    },
+    "note": "Initial Windows sandbox pytest stalled during collection; its two processes were stopped and the elevated rerun passed."
+  }
+}
